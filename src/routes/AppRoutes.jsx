@@ -1,0 +1,44 @@
+import { Routes, Route } from 'react-router-dom';
+import MainLayout from '../layouts/MainLayout';
+import DashboardLayout from '../layouts/DashboardLayout';
+import Home from '../pages/Home';
+import FeaturesPage from '../pages/FeaturesPage';
+import PricingPage from '../pages/PricingPage';
+import AboutPage from '../pages/AboutPage';
+import SignInPage from '../pages/SignInPage';
+import SignUpPage from '../pages/SignUpPage';
+import DashboardPage from '../pages/DashboardPage';
+import ChatPage from '../pages/ChatPage';
+import DocumentsPage from '../pages/DocumentsPage';
+import SearchPage from '../pages/SearchPage';
+import MeetingsPage from '../pages/MeetingsPage';
+import SettingsPage from '../pages/SettingsPage';
+import AnalyticsPage from '../pages/AnalyticsPage';
+import TeamPage from '../pages/TeamPage';
+
+const AppRoutes = () => {
+  return (
+    <Routes>
+      <Route element={<MainLayout />}>
+        <Route path="/" element={<Home />} />
+        <Route path="/features" element={<FeaturesPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/signin" element={<SignInPage />} />
+        <Route path="/signup" element={<SignUpPage />} />
+      </Route>
+      <Route element={<DashboardLayout />}>
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/chat" element={<ChatPage />} />
+        <Route path="/documents" element={<DocumentsPage />} />
+        <Route path="/search" element={<SearchPage />} />
+        <Route path="/meetings" element={<MeetingsPage />} />
+        <Route path="/team" element={<TeamPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/analytics" element={<AnalyticsPage />} />
+      </Route>
+    </Routes>
+  );
+};
+
+export default AppRoutes;
