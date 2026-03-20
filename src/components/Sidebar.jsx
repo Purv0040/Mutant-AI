@@ -1,4 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 const navItems = [
   {
@@ -19,7 +20,6 @@ const navItems = [
         <polyline points="14 2 14 8 20 8" />
         <line x1="16" y1="13" x2="8" y2="13" />
         <line x1="16" y1="17" x2="8" y2="17" />
-        <polyline points="10 9 9 9 8 9" />
       </svg>
     ),
   },
@@ -54,6 +54,8 @@ const recentChats = [
 ]
 
 export default function Sidebar() {
+  const { user, logout } = useAuth()
+
   return (
     <aside className="w-[200px] min-w-[200px] h-screen bg-sidebar flex flex-col overflow-hidden">
       {/* Logo */}
@@ -62,8 +64,6 @@ export default function Sidebar() {
           <div className="w-7 h-7 rounded-lg bg-accent flex items-center justify-center">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 0 6h-1v1a4 4 0 0 1-8 0v-1H7a3 3 0 0 1 0-6h1V6a4 4 0 0 1 4-4z" />
-              <circle cx="9" cy="10" r="1" fill="white" stroke="none" />
-              <circle cx="15" cy="10" r="1" fill="white" stroke="none" />
             </svg>
           </div>
           <span className="text-white font-semibold text-[15px] tracking-tight">Mutant AI</span>
@@ -110,17 +110,29 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Footer */}
+      {/* Footer — user info + logout */}
       <div className="p-3 border-t border-white/5">
-        <div className="flex items-center gap-2 px-2 py-1.5">
+        <div className="flex items-center gap-2 px-2 py-1.5 mb-1">
           <div className="w-7 h-7 rounded-full bg-accent flex items-center justify-center text-white text-[11px] font-semibold">
-            P
+            {user?.username?.[0]?.toUpperCase() ?? 'U'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white/70 text-[12px] font-medium truncate">Purv</p>
-            <p className="text-white/30 text-[10px] truncate">Admin</p>
+            <p className="text-white/70 text-[12px] font-medium truncate">{user?.username ?? 'User'}</p>
+            <p className="text-white/30 text-[10px] truncate">{user?.email ?? ''}</p>
           </div>
         </div>
+        <button
+          onClick={logout}
+          id="logout-btn"
+          className="flex items-center gap-2 w-full px-3 py-1.5 rounded-btn text-[12px] text-white/40 hover:text-red-400 hover:bg-white/5 transition-all"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          Sign out
+        </button>
       </div>
     </aside>
   )
