@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import TopBar from '../components/TopBar'
+import { getDocuments, summarizeDoc } from '../api'
 
 const statCards = [
   {
@@ -51,12 +53,12 @@ const statCards = [
   },
 ]
 
-const keyFindings = [
-  { dot: 'bg-green-500', text: 'Revenue grew 23% YoY — strongest growth in 5 years' },
-  { dot: 'bg-blue-500', text: 'Enterprise client count increased from 31 to 47' },
-  { dot: 'bg-amber-500', text: 'Operating costs rose 11% due to headcount expansion' },
-  { dot: 'bg-red-500', text: 'EU regulatory compliance risk flagged for Q1 2025' },
-]
+const findingColors = {
+  positive: 'bg-green-500',
+  neutral: 'bg-blue-500',
+  warning: 'bg-amber-500',
+  risk: 'bg-red-500',
+}
 
 const suggestions = [
   'What are the financial risks?',
@@ -66,6 +68,47 @@ const suggestions = [
 ]
 
 export default function Summarization() {
+  const [filename, setFilename] = useState('')
+  const [summary, setSummary] = useState('')
+  const [findings, setFindings] = useState([])
+  const [pageCount, setPageCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const run = async () => {
+      setLoading(true)
+      setError('')
+      try {
+        const docs = await getDocuments()
+        if (!docs.length) {
+          setError('Upload a document first to generate summary.')
+          return
+        }
+        const selected = docs[0]
+        setFilename(selected.filename)
+
+        const data = await summarizeDoc(selected.filename)
+        setSummary(data.summary)
+        setFindings(data.findings || [])
+        setPageCount(data.page_count || 0)
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    run()
+  }, [])
+
+  const computedCards = [
+    { ...statCards[0], value: String(pageCount || 0), sub: 'From analyzed file' },
+    { ...statCards[1], value: String(findings.length || 0), sub: 'Identified' },
+    statCards[2],
+    statCards[3],
+  ]
+
   return (
     <div className="flex flex-col h-full">
       <TopBar
@@ -87,9 +130,9 @@ export default function Summarization() {
         <div className="bg-white ghost-border-solid rounded-card p-4 flex items-center gap-4">
           <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center text-xl">📄</div>
           <div className="flex-1">
-            <p className="font-semibold text-[15px] text-on-surface tracking-tight">Annual_Report_2024.pdf</p>
+            <p className="font-semibold text-[15px] text-on-surface tracking-tight">{filename || 'No document selected'}</p>
             <p className="text-[12px] text-on-surface-variant mt-0.5">
-              50 pages · Uploaded 2 hrs ago ·
+              {pageCount || 0} pages ·
               <span className="ml-1 text-green-600 font-medium">✓ Auto-summarized</span>
             </p>
           </div>
@@ -97,7 +140,7 @@ export default function Summarization() {
 
         {/* Stat Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {statCards.map((card) => (
+          {computedCards.map((card) => (
             <div key={card.label} className="bg-white ghost-border-solid rounded-card p-4">
               <div className="mb-3">{card.icon}</div>
               <p className="text-[28px] font-bold text-on-surface tracking-tight leading-none">{card.value}</p>
@@ -115,21 +158,24 @@ export default function Summarization() {
               <h3 className="font-semibold text-[15px] text-on-surface tracking-tight">Executive Summary</h3>
               <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-semibold">AI Generated</span>
             </div>
-            <p className="text-[14px] text-on-surface leading-relaxed">
-              The Annual Report 2024 demonstrates strong financial growth with revenue increasing 23% YoY to ₹142 crore. Operating margins improved significantly driven by cost optimization. The company expanded to 3 new geographies and onboarded 47 enterprise clients. Key risks include currency volatility and regulatory changes in EU markets.
-            </p>
+            {loading && <p className="text-[13px] text-on-surface-variant">Generating summary...</p>}
+            {!loading && !error && <p className="text-[14px] text-on-surface leading-relaxed">{summary}</p>}
+            {error && <p className="text-[13px] text-red-600">{error}</p>}
           </div>
 
           {/* Key Findings */}
           <div className="bg-white ghost-border-solid rounded-card p-5">
             <h3 className="font-semibold text-[15px] text-on-surface tracking-tight mb-4">Key Findings</h3>
             <div className="space-y-3">
-              {keyFindings.map((item, i) => (
+              {findings.map((item, i) => (
                 <div key={i} className="flex items-start gap-3">
-                  <div className={`w-2 h-2 rounded-full ${item.dot} mt-1.5 flex-shrink-0`} />
-                  <p className="text-[13px] text-on-surface leading-snug">{item.text}</p>
+                  <div className={`w-2 h-2 rounded-full ${findingColors[item.type] || findingColors.neutral} mt-1.5 flex-shrink-0`} />
+                  <p className="text-[13px] text-on-surface leading-snug">{item.text || String(item)}</p>
                 </div>
               ))}
+              {!loading && !findings.length && !error && (
+                <p className="text-[13px] text-on-surface-variant">No findings available yet.</p>
+              )}
             </div>
           </div>
         </div>

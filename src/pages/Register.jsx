@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { register as registerApi } from '../api'
 
 export default function Register() {
   const navigate = useNavigate()
 
-  const [form, setForm] = useState({ username: '', email: '', password: '', confirm: '' })
+  const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -22,17 +23,11 @@ export default function Register() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('http://localhost:8000/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: form.username,
-          email: form.email,
-          password: form.password,
-        }),
+      await registerApi({
+        name: form.name,
+        email: form.email,
+        password: form.password,
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || 'Registration failed')
       navigate('/login', { state: { registered: true } })
     } catch (err) {
       setError(err.message)
@@ -62,17 +57,17 @@ export default function Register() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Username */}
             <div>
-              <label className="block text-[12px] font-medium text-on-surface mb-1.5" htmlFor="username">
-                Username
+              <label className="block text-[12px] font-medium text-on-surface mb-1.5" htmlFor="name">
+                Name
               </label>
               <input
-                id="username"
-                name="username"
+                id="name"
+                name="name"
                 type="text"
                 required
-                value={form.username}
+                value={form.name}
                 onChange={handleChange}
-                placeholder="johndoe"
+                placeholder="John Doe"
                 className="w-full px-3.5 py-2.5 rounded-btn bg-surface-low text-[14px] text-on-surface placeholder-outline outline-none ghost-border focus:border-accent focus:bg-white transition-all"
               />
             </div>

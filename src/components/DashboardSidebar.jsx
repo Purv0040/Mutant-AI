@@ -1,8 +1,16 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const DashboardSidebar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const isActive = (path) => location.pathname === path;
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <aside className="flex flex-col w-64 h-full p-4 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-r-3xl h-screen sticky left-0 top-0 shadow-xl shadow-indigo-500/5 z-40">
@@ -36,20 +44,20 @@ const DashboardSidebar = () => {
         </Link>
         {/* Chat */}
         <Link
-          to="/chat"
+          to="/ask-ai"
           className={`flex items-center gap-3 px-4 py-3 font-manrope text-sm font-medium tracking-tight rounded-xl transition-all duration-300 ${
-            isActive('/chat')
+            isActive('/ask-ai')
               ? 'text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-900/30 border-l-4 border-indigo-600'
               : 'text-slate-500 dark:text-slate-400 hover:text-indigo-500 hover:bg-indigo-50/30 scale-95 active:scale-90'
           }`}
         >
-          <span className="material-symbols-outlined" style={isActive('/chat') ? { fontVariationSettings: "'FILL' 1" } : {}}>
+          <span className="material-symbols-outlined" style={isActive('/ask-ai') ? { fontVariationSettings: "'FILL' 1" } : {}}>
             chat_bubble
           </span>
-          <span>Chat</span>
+          <span>Ask AI</span>
         </Link>
 
-        {isActive('/chat') && (
+        {isActive('/ask-ai') && (
           <>
             <div className="pt-6 pb-2 px-4">
               <span className="text-[10px] font-label font-bold text-on-surface-variant/40 uppercase tracking-widest">
@@ -74,17 +82,17 @@ const DashboardSidebar = () => {
 
         {/* Documents */}
         <Link
-          to="/documents"
+          to="/summarization"
           className={`flex items-center gap-3 px-4 py-3 font-manrope text-sm font-medium tracking-tight transition-all duration-300 scale-95 active:scale-90 ${
-            isActive('/documents')
+            isActive('/summarization')
               ? 'text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-900/30 border-l-4 border-indigo-600 rounded-r-xl'
               : 'text-slate-500 dark:text-slate-400 hover:text-indigo-500 hover:bg-indigo-50/30 dark:hover:bg-indigo-900/20 rounded-xl transition-transform'
           }`}
         >
-          <span className="material-symbols-outlined" style={isActive('/documents') ? { fontVariationSettings: "'FILL' 1" } : {}}>
+          <span className="material-symbols-outlined" style={isActive('/summarization') ? { fontVariationSettings: "'FILL' 1" } : {}}>
             description
           </span>
-          <span>Documents</span>
+          <span>Summarization</span>
         </Link>
         {/* Meetings */}
         <Link
@@ -102,17 +110,17 @@ const DashboardSidebar = () => {
         </Link>
         {/* Search */}
         <Link
-          to="/search"
+          to="/categorization"
           className={`flex items-center gap-3 px-4 py-3 font-manrope text-sm font-medium tracking-tight transition-all duration-300 scale-95 active:scale-90 ${
-            isActive('/search')
+            isActive('/categorization')
               ? 'text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-900/30 border-l-4 border-indigo-600 rounded-xl'
               : 'text-slate-500 dark:text-slate-400 hover:text-indigo-500 hover:bg-indigo-50/30 dark:hover:bg-indigo-900/20 rounded-xl transition-transform'
           }`}
         >
-          <span className="material-symbols-outlined" style={isActive('/search') ? { fontVariationSettings: "'FILL' 1" } : {}}>
-            search
+          <span className="material-symbols-outlined" style={isActive('/categorization') ? { fontVariationSettings: "'FILL' 1" } : {}}>
+            category
           </span>
-          <span>Search</span>
+          <span>Categorization</span>
         </Link>
         {/* Analytics */}
         <Link
@@ -165,13 +173,15 @@ const DashboardSidebar = () => {
           <span className="material-symbols-outlined">account_circle</span>
           <span>Profile</span>
         </Link>
-        <Link
-          to="/"
+        <button
+          type="button"
+          id="logout-btn"
+          onClick={handleLogout}
           className="flex items-center gap-3 px-4 py-3 font-manrope text-sm font-medium tracking-tight rounded-xl text-slate-500 dark:text-slate-400 hover:text-indigo-500 hover:bg-indigo-50/30 transition-all duration-300"
         >
           <span className="material-symbols-outlined">logout</span>
           <span>Logout</span>
-        </Link>
+        </button>
       </div>
     </aside>
   );
