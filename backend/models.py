@@ -1,31 +1,51 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, func
-from sqlalchemy.orm import relationship
+from datetime import datetime
+from typing import Optional
+from pydantic import BaseModel, EmailStr, Field
 
-from database import Base
+class UserBase(BaseModel):
+    name: str
+    email: EmailStr
 
+class UserCreate(UserBase):
+    password: str
 
-class User(Base):
-    __tablename__ = "users"
+class UserInDB(UserBase):
+    id: str = Field(alias="_id")
+    hashed_password: str
+    created_at: datetime
+    
+    class Config:
+        populate_by_name = True
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(120), nullable=False)
-    email = Column(String(255), unique=True, index=True, nullable=False)
-    hashed_password = Column(String(255), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+class UserResponse(UserBase):
+    id: str = Field(alias="_id")
+    created_at: datetime
+    
+    class Config:
+        populate_by_name = True
 
-    documents = relationship("Document", back_populates="user", cascade="all, delete-orphan")
+class DocumentBase(BaseModel):
+    filename: str
+    file_path: str
+    category: Optional[str] = None
+    summary: Optional[str] = None
+    botpress_file_id: Optional[str] = None
+    status: str = "uploaded"
 
+class DocumentCreate(DocumentBase):
+    user_id: str
 
-class Document(Base):
-    __tablename__ = "documents"
+class DocumentInDB(DocumentCreate):
+    id: str = Field(alias="_id")
+    uploaded_at: datetime
+    
+    class Config:
+        populate_by_name = True
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    filename = Column(String(255), nullable=False)
-    file_path = Column(String(500), nullable=False)
-    category = Column(String(80), nullable=True)
-    summary = Column(Text, nullable=True)
-    status = Column(String(40), default="uploaded", nullable=False)
-    uploaded_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
-    user = relationship("User", back_populates="documents")
+class DocumentResponse(DocumentBase):
+    id: str = Field(alias="_id")
+    user_id: str
+    uploaded_at: datetime
+    
+    class Config:
+        populate_by_name = True

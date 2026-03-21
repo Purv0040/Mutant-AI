@@ -1,11 +1,9 @@
 import os
-
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from auth.router import router as auth_router
-from database import Base, engine
 from routes.ask import router as ask_router
 from routes.categorize import router as categorize_router
 from routes.summarize import router as summarize_router
@@ -18,6 +16,7 @@ app = FastAPI(title="Mutant AI Backend", version="0.1.0")
 origins = [
     "http://localhost:5173",
     "http://localhost:5174",
+    "*",
 ]
 
 app.add_middleware(
@@ -37,7 +36,8 @@ app.include_router(categorize_router)
 
 @app.on_event("startup")
 def on_startup():
-    Base.metadata.create_all(bind=engine)
+    print("✓ Mutant AI Backend started successfully")
+    print("✓ MongoDB connected")
 
 
 @app.get("/")

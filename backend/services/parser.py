@@ -1,6 +1,8 @@
+import csv
 from pathlib import Path
 from typing import List, Dict
 
+from docx import Document as DocxDocument
 from openpyxl import load_workbook
 from pypdf import PdfReader
 from pptx import Presentation
@@ -55,6 +57,25 @@ def parse_file(path: str, filename: str) -> List[Dict[str, str | int]]:
                     rows.append(" | ".join(values))
             for part in _chunk_text("\n".join(rows)):
                 records.append({"text": part, "page": 1, "source": f"{filename}:{sheet.title}"})
+        return records
+
+    if suffix == ".docx":
+        document = DocxDocument(path)
+        paragraphs = [p.text for p in document.paragraphs if p.text and p.text.strip()]
+        for part in _chunk_text("\n".join(paragraphs)):
+            records.append({"text": part, "page": 1, "source": filename})
+        return records
+
+    if suffix == ".csv":
+        rows: List[str] = []
+        with open(path, "r", encoding="utf-8", newline="") as handle:
+            reader = csv.reader(handle)
+            for row in reader:
+                values = [cell.strip() for cell in row if cell and cell.strip()]
+                if values:
+                    rows.append(" | ".join(values))
+        for part in _chunk_text("\n".join(rows)):
+            records.append({"text": part, "page": 1, "source": filename})
         return records
 
     raise ValueError("Unsupported file type")

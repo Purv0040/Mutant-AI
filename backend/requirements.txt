@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-sqlalchemy
+pymongo
 passlib[bcrypt]
 python-jose[cryptography]
 pinecone
@@ -10,8 +10,10 @@ langchain-openai
 langchain-community
 openai
 pypdf
+python-docx
 python-pptx
 openpyxl
 python-dotenv
 python-multipart
 email-validator
+requests

@@ -1,12 +1,49 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { login } from '../api';
+import { useAuth } from '../context/AuthContext';
 
 const SignInPage = () => {
   const navigate = useNavigate();
+  const { login: authLogin } = useAuth();
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSignIn = (e) => {
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+    setError('');
+  };
+
+  const handleSignIn = async (e) => {
     e.preventDefault();
-    // In a real app, authentication logic goes here
-    navigate('/dashboard');
+    
+    if (!formData.email.trim() || !formData.password) {
+      setError('Please enter email and password');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await login({
+        email: formData.email,
+        password: formData.password,
+      });
+      
+      authLogin(response.access_token, response.user);
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.message || 'Sign in failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -40,25 +77,13 @@ const SignInPage = () => {
             <h2 className="font-headline text-2xl font-bold text-on-surface">Welcome back</h2>
             <p className="text-on-surface-variant mt-1">Please enter your details to access your intelligence surface.</p>
           </div>
-          {/* Social Provider */}
-          <button 
-            type="button" 
-            onClick={() => navigate('/dashboard')}
-            className="w-full flex items-center justify-center gap-3 py-3.5 px-6 bg-surface-container-low hover:bg-surface-container transition-colors rounded-DEFAULT font-semibold text-on-surface group"
-          >
-            <img
-              alt="Google"
-              className="w-5 h-5"
-              data-alt="Google logo icon"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqFNv9lBeFI__beWjGgm3JvfIUhgQreFEsd0YuPTr3XwaVzU7j7hM0YjCf4XqHsBoiLVfNY_JOKxvUJ6BZifdU-3uV8gmdrjfutaa6YbqPgVFMWtBY8WU_L_GusJHX5_L-37ezSl7r_kJuScfvPqzXxms7lLkRQm7bFn87Q5WMyITyszD6iUAySO9PtKV1msdvspdhZB9M-dTpl7gpsIL9smx-4v3NAW92ftkLEpD8fD8riwJ_wrC6Zojc1OFkZGV7EA0PVTnPGz8"
-            />
-            <span>Sign in with Google</span>
-          </button>
-          <div className="relative my-8 flex items-center">
-            <div className="flex-grow h-[1px] bg-surface-variant"></div>
-            <span className="mx-4 text-xs font-label uppercase tracking-widest text-outline">or use email</span>
-            <div className="flex-grow h-[1px] bg-surface-variant"></div>
-          </div>
+
+          {error && (
+            <div className="mb-6 p-4 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-300 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
           {/* Main Auth Form */}
           <form className="space-y-6" onSubmit={handleSignIn}>
             <div className="space-y-2">
@@ -70,11 +95,14 @@ const SignInPage = () => {
               </label>
               <div className="relative">
                 <input
-                  className="w-full px-4 py-4 bg-surface-container-low border-none rounded-DEFAULT focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all placeholder:text-outline/50"
+                  className="w-full px-4 py-4 bg-surface-container-low border-none rounded-DEFAULT focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all placeholder:text-outline/50 disabled:opacity-50"
                   id="email"
                   name="email"
                   placeholder="name@mutant.ai"
                   type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  disabled={loading}
                 />
                 <span
                   className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-outline/40"
@@ -98,11 +126,14 @@ const SignInPage = () => {
               </div>
               <div className="relative">
                 <input
-                  className="w-full px-4 py-4 bg-surface-container-low border-none rounded-DEFAULT focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all placeholder:text-outline/50"
+                  className="w-full px-4 py-4 bg-surface-container-low border-none rounded-DEFAULT focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all placeholder:text-outline/50 disabled:opacity-50"
                   id="password"
                   name="password"
                   placeholder="••••••••"
                   type="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  disabled={loading}
                 />
                 <span
                   className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-outline/40"
@@ -113,10 +144,11 @@ const SignInPage = () => {
               </div>
             </div>
             <button
-              className="w-full py-4 mutant-gradient-bg text-on-primary font-bold rounded-DEFAULT shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all active:scale-[0.98]"
+              className="w-full py-4 mutant-gradient-bg text-on-primary font-bold rounded-DEFAULT shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
               type="submit"
+              disabled={loading}
             >
-              Sign In
+              {loading ? 'Signing In...' : 'Sign In'}
             </button>
           </form>
           {/* Switch Mode Footer */}
