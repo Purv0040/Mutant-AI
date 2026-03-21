@@ -8,74 +8,67 @@ from sentence_transformers import SentenceTransformer
 
 load_dotenv()
 
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY", "")
-PINECONE_HOST = os.getenv("PINECONE_HOST", "")
-PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "mutant-ai")
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY", "").strip()
+PINECONE_HOST = os.getenv("PINECONE_HOST", "").strip() or None
+PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "mutant-ai").strip()
 
-_model: SentenceTransformer | None = None
+_model = None
 _index = None
 
 
-def _get_model() -> SentenceTransformer:
+def get_model():
     global _model
     if _model is None:
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
+        _model = SentenceTransformer("BAAI/bge-large-en-v1.5")  # 1024 dim to match Pinecone index
     return _model
 
 
-def _get_index():
+def get_index():
     global _index
     if _index is None:
-        if not PINECONE_API_KEY:
-            raise RuntimeError("PINECONE_API_KEY is not configured")
-        client = Pinecone(api_key=PINECONE_API_KEY)
-        if PINECONE_HOST:
-            _index = client.Index(host=PINECONE_HOST)
-        else:
-            _index = client.Index(PINECONE_INDEX_NAME)
+        api_key = os.getenv("PINECONE_API_KEY", "********-****-****-****-************").strip()
+        pc = Pinecone(api_key=api_key)
+        _index = pc.Index("mutant-ai")
+
     return _index
 
 
-def embed_and_store(chunks: List[Dict[str, Any]], user_id: int, filename: str) -> int:
-    if not chunks:
-        return 0
+# 🔹 STORE DATA
+def embed_and_store(chunks: List[Dict[str, Any]], user_id: int, filename: str):
+    model = get_model()
+    index = get_index()
 
-    model = _get_model()
-    index = _get_index()
-
-    texts = [str(item.get("text", "")) for item in chunks]
+    texts = [c["text"] for c in chunks]
     vectors = model.encode(texts, normalize_embeddings=True)
 
-    payload = []
+    data = []
     for i, vec in enumerate(vectors):
-        item = chunks[i]
-        payload.append(
-            {
-                "id": f"{user_id}:{filename}:{uuid.uuid4().hex}",
-                "values": vec.tolist(),
-                "metadata": {
-                    "text": str(item.get("text", "")),
-                    "source": str(item.get("source", filename)),
-                    "page": int(item.get("page", 1)),
-                    "user_id": str(user_id),
-                    "filename": filename,
-                },
+        data.append({
+            "id": f"{user_id}_{uuid.uuid4().hex}",
+            "values": vec.tolist(),
+            "metadata": {
+                "text": texts[i],
+                "user_id": str(user_id),
+                "filename": filename
             }
-        )
+        })
 
-    index.upsert(vectors=payload)
-    return len(payload)
+    index.upsert(vectors=data)
+    return len(data)
 
 
-def query_documents(question: str, user_id: int, top_k: int = 5) -> List[Dict[str, Any]]:
-    model = _get_model()
-    index = _get_index()
+# 🔹 QUERY DATA
+def query_documents(question: str, user_id: int, top_k: int = 5):
+    model = get_model()
+    index = get_index()
 
-    vector = model.encode(question, normalize_embeddings=True).tolist()
-    response = index.query(
-        vector=vector,
+    query_vec = model.encode(question, normalize_embeddings=True).tolist()
+
+    res = index.query(
+        vector=query_vec,
         top_k=top_k,
         include_metadata=True,
-        filter={"user_id": {"$eq": str(user_id)}},
+        filter={"user_id": {"$eq": str(user_id)}}
     )
-    return response.get("matches", [])
+
+    return res.matches   # ✅ correct
