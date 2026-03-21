@@ -3,8 +3,6 @@ import json
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from langchain.chains.summarize import load_summarize_chain
-from langchain.schema import Document as LangDocument
 
 from auth.dependencies import get_current_user
 from database import get_db
@@ -44,10 +42,15 @@ def summarize_document(
     if not chunks:
         raise HTTPException(status_code=400, detail="No readable text found in document")
 
-    lc_docs = [LangDocument(page_content=chunk["text"]) for chunk in chunks]
     llm = get_smart_llm()
-    chain = load_summarize_chain(llm, chain_type="map_reduce")
-    summary = chain.run(lc_docs)
+    combined_text = "\n\n".join(chunk.get("text", "") for chunk in chunks)
+    summary_prompt = (
+        "Summarize the following document content in concise, clear business language. "
+        "Include the main objective, key decisions or policy points, and important numbers if present.\n\n"
+        f"Content:\n{combined_text[:15000]}"
+    )
+    summary_raw = llm.invoke(summary_prompt)
+    summary = getattr(summary_raw, "content", str(summary_raw)).strip()
 
     findings_prompt = (
         "From this summary, produce exactly 4 key findings as JSON array. "

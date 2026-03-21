@@ -3,14 +3,14 @@ import { getDocuments, uploadDocument } from '../api'
 
 const typeStyle = {
   PDF: { badge: 'bg-red-100 text-red-700', icon: '📄' },
-  XLSX: { badge: 'bg-green-100 text-green-700', icon: '📊' },
-  PPT: { badge: 'bg-amber-100 text-amber-700', icon: '📋' },
+  DOCX: { badge: 'bg-blue-100 text-blue-700', icon: '📝' },
+  CSV: { badge: 'bg-green-100 text-green-700', icon: '📊' },
 }
 
 function extensionType(filename) {
   const ext = filename.split('.').pop()?.toUpperCase()
-  if (ext === 'PPTX') return 'PPT'
-  if (ext === 'XLSX') return 'XLSX'
+  if (ext === 'DOCX') return 'DOCX'
+  if (ext === 'CSV') return 'CSV'
   return 'PDF'
 }
 
@@ -104,7 +104,7 @@ export default function DocumentPanel({ onUploaded }) {
           ref={fileInputRef}
           type="file"
           className="hidden"
-          accept=".pdf,.pptx,.xlsx"
+          accept=".pdf,.docx,.csv"
           onChange={handleSelectFile}
         />
         <button
@@ -121,7 +121,7 @@ export default function DocumentPanel({ onUploaded }) {
             </svg>
           </div>
           <p className="text-[11px] font-medium text-on-surface-variant">{uploading ? 'Uploading...' : 'Upload file'}</p>
-          <p className="text-[10px] text-outline mt-0.5">PDF, XLSX, PPT</p>
+          <p className="text-[10px] text-outline mt-0.5">PDF, DOCX, CSV</p>
         </button>
       </div>
     </aside>

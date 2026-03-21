@@ -1,4 +1,8 @@
+import { useNavigate } from 'react-router-dom'
+
 const DashboardPage = () => {
+  const navigate = useNavigate()
+
   return (
     <main className="w-full h-full p-8 lg:p-12 overflow-y-auto min-h-screen">
       {/* Top App Bar Content */}
@@ -147,7 +151,10 @@ const DashboardPage = () => {
                 arrow_forward
               </span>
             </button>
-            <button className="flex items-center justify-between p-6 bg-surface-container-highest text-on-surface rounded-lg transition-all hover:bg-surface-container-high active:scale-95 group">
+            <button
+              className="flex items-center justify-between p-6 bg-surface-container-highest text-on-surface rounded-lg transition-all hover:bg-surface-container-high active:scale-95 group"
+              onClick={() => navigate('/documents')}
+            >
               <div className="flex items-center gap-4">
                 <span className="material-symbols-outlined text-3xl text-primary" data-icon="cloud_upload">
                   cloud_upload

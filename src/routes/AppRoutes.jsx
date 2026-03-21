@@ -8,7 +8,7 @@ import AboutPage from '../pages/AboutPage';
 import SignInPage from '../pages/SignInPage';
 import SignUpPage from '../pages/SignUpPage';
 import DashboardPage from '../pages/DashboardPage';
-import ChatPage from '../pages/ChatPage';
+import Chat from '../pages/Chat';
 import DocumentsPage from '../pages/DocumentsPage';
 import SearchPage from '../pages/SearchPage';
 import MeetingsPage from '../pages/MeetingsPage';
@@ -37,7 +37,14 @@ const AppRoutes = () => {
       </Route>
       <Route element={<DashboardLayout />}>
         <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/chat" element={<ChatPage />} />
+        <Route
+          path="/chat"
+          element={
+            <ProtectedRoute>
+              <Chat />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/documents" element={<DocumentsPage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/meetings" element={<MeetingsPage />} />

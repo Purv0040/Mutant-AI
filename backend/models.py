@@ -25,6 +25,7 @@ class Document(Base):
     file_path = Column(String(500), nullable=False)
     category = Column(String(80), nullable=True)
     summary = Column(Text, nullable=True)
+    botpress_file_id = Column(String, nullable=True)
     status = Column(String(40), default="uploaded", nullable=False)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
