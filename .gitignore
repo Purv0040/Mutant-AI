@@ -12,6 +12,15 @@ build/
 .env
 .env.local
 .env.*.local
+backend/.env
+
+# Python backend artifacts
+backend/uploads/
+uploads/
+__pycache__/
+*.pyc
+*.db
+indexes/
 
 # Logs
 logs/

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { login as loginApi } from '../api'
 
 export default function Login() {
   const { login } = useAuth()
@@ -20,14 +21,8 @@ export default function Login() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('http://localhost:8000/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || 'Login failed')
-      login(data.access_token)
+      const data = await loginApi(form)
+      login(data.access_token, data.user)
       navigate('/ask-ai')
     } catch (err) {
       setError(err.message)

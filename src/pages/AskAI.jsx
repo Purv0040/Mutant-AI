@@ -2,38 +2,39 @@ import { useState } from 'react'
 import TopBar from '../components/TopBar'
 import ChatMessage from '../components/ChatMessage'
 import DocumentPanel from '../components/DocumentPanel'
-
-const initialMessages = [
-  {
-    id: 1,
-    role: 'user',
-    text: 'What is the leave policy for interns?',
-  },
-  {
-    id: 2,
-    role: 'ai',
-    text: 'Interns are entitled to 10 days of paid leave per calendar year. Leave must be approved by the direct manager at least 3 days in advance.',
-    sources: ['📄 HR_Policy.pdf · Page 3', '📋 Employee_Handbook.pdf · Sec 4.2'],
-  },
-]
+import { askQuestion } from '../api'
 
 export default function AskAI() {
-  const [messages, setMessages] = useState(initialMessages)
+  const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return
-    setMessages(prev => [...prev, { id: Date.now(), role: 'user', text: input }])
+    const question = input
+    setMessages((prev) => [...prev, { id: Date.now(), role: 'user', text: question }])
     setInput('')
-    // Simulate AI response
-    setTimeout(() => {
-      setMessages(prev => [...prev, {
-        id: Date.now() + 1,
-        role: 'ai',
-        text: 'Based on your company documents, here is the relevant information I found. Please review the cited sources for full context.',
-        sources: ['📄 HR_Policy.pdf · Page 7'],
-      }])
-    }, 800)
+    setLoading(true)
+    setError('')
+
+    try {
+      const data = await askQuestion(question)
+      const sourceChips = (data.source_details || []).map((source) => `${source.filename} · p.${source.page}`)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          role: 'ai',
+          text: data.answer,
+          sources: sourceChips,
+        },
+      ])
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -57,6 +58,9 @@ export default function AskAI() {
         <div className="flex-1 flex flex-col min-w-0">
           {/* Messages */}
           <div className="flex-1 overflow-y-auto scrollbar-thin px-6 py-6 space-y-5">
+            {messages.length === 0 && (
+              <p className="text-[13px] text-on-surface-variant">Ask a question after uploading a document to see grounded answers with citations.</p>
+            )}
             {messages.map((msg) => (
               <ChatMessage
                 key={msg.id}
@@ -65,6 +69,8 @@ export default function AskAI() {
                 sources={msg.sources}
               />
             ))}
+            {loading && <p className="text-[12px] text-on-surface-variant">Thinking...</p>}
+            {error && <p className="text-[12px] text-red-600">{error}</p>}
           </div>
 
           {/* Input area */}
@@ -81,6 +87,7 @@ export default function AskAI() {
               />
               <button
                 onClick={handleSend}
+                disabled={loading}
                 className="w-8 h-8 rounded-btn bg-primary text-white flex items-center justify-center hover:bg-accent transition-colors"
                 id="send-button"
               >

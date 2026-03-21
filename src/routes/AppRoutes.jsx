@@ -15,6 +15,12 @@ import MeetingsPage from '../pages/MeetingsPage';
 import SettingsPage from '../pages/SettingsPage';
 import AnalyticsPage from '../pages/AnalyticsPage';
 import TeamPage from '../pages/TeamPage';
+import Login from '../pages/Login';
+import Register from '../pages/Register';
+import AskAI from '../pages/AskAI';
+import Summarization from '../pages/Summarization';
+import Categorization from '../pages/Categorization';
+import ProtectedRoute from '../components/ProtectedRoute';
 
 const AppRoutes = () => {
   return (
@@ -26,6 +32,8 @@ const AppRoutes = () => {
         <Route path="/about" element={<AboutPage />} />
         <Route path="/signin" element={<SignInPage />} />
         <Route path="/signup" element={<SignUpPage />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
       </Route>
       <Route element={<DashboardLayout />}>
         <Route path="/dashboard" element={<DashboardPage />} />
@@ -36,6 +44,30 @@ const AppRoutes = () => {
         <Route path="/team" element={<TeamPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
+        <Route
+          path="/ask-ai"
+          element={
+            <ProtectedRoute>
+              <AskAI />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/summarization"
+          element={
+            <ProtectedRoute>
+              <Summarization />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/categorization"
+          element={
+            <ProtectedRoute>
+              <Categorization />
+            </ProtectedRoute>
+          }
+        />
       </Route>
     </Routes>
   );
