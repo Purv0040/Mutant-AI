@@ -78,3 +78,28 @@ export function categorizeDoc(filename) {
     body: JSON.stringify({ filename }),
   })
 }
+
+// User Profile CRUD Operations
+export function getUserProfile() {
+  return request('/auth/profile')
+}
+
+export function updateUserProfile(payload) {
+  return request('/auth/profile', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+
+export function deleteUserAccount() {
+  return request('/auth/profile', {
+    method: 'DELETE',
+  })
+}
+
+export function deleteDocument(docId) {
+  return request(`/documents/${docId}`, {
+    method: 'DELETE',
+  })
+}

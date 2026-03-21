@@ -20,6 +20,7 @@ import Register from '../pages/Register';
 import AskAI from '../pages/AskAI';
 import Summarization from '../pages/Summarization';
 import Categorization from '../pages/Categorization';
+import UserProfile from '../pages/UserProfile';
 import ProtectedRoute from '../components/ProtectedRoute';
 
 const AppRoutes = () => {
@@ -51,6 +52,14 @@ const AppRoutes = () => {
         <Route path="/team" element={<TeamPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <UserProfile />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/ask-ai"
           element={

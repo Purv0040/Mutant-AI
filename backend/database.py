@@ -1,21 +1,30 @@
 import os
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from pymongo import MongoClient
+from pymongo.server_api import ServerApi
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./mutant.db")
+MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
+MONGODB_DB_NAME = os.getenv("MONGODB_DB_NAME", "mutant_ai")
 
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+try:
+    client = MongoClient(MONGODB_URL, server_api=ServerApi('1'), serverSelectionTimeoutMS=5000)
+    client.admin.command('ping')
+    print("✓ Connected to MongoDB")
+except Exception as e:
+    print(f"✗ MongoDB connection failed: {e}")
+    client = None
 
+db = client[MONGODB_DB_NAME] if client else None
 
 def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    """Return the MongoDB database instance"""
+    if db is None:
+        raise RuntimeError("MongoDB not connected")
+    return db
+
+def close_db():
+    """Close the MongoDB connection"""
+    if client:
+        client.close()
