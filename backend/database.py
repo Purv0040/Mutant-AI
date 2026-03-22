@@ -27,12 +27,12 @@ def _connect():
         client.admin.command("ping")
         db = client[MONGODB_DB_NAME]
         last_error = None
-        print("✓ Connected to MongoDB")
+        print("SUCCESS: Connected to MongoDB")
     except Exception as e:
         last_error = str(e)
         client = None
         db = None
-        print(f"✗ MongoDB connection failed: {e}")
+        print(f"ERROR: MongoDB connection failed: {e}")
 
 
 # Initial connect attempt at startup; runtime calls can retry.

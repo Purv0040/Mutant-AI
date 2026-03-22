@@ -22,9 +22,13 @@ export default function AskAI() {
       const data = await askQuestion(question)
       
       // Handle both old and new response formats
-      const sourceChips = data.source_details 
-        ? (data.source_details || []).map((source) => `${source.filename} · p.${source.page}`)
+      // sources can be [{filename, score}] objects or plain strings
+      const rawSources = data.source_details
+        ? (data.source_details || []).map((s) => `${s.filename} · p.${s.page}`)
         : (data.sources || [])
+      const sourceChips = rawSources.map((s) =>
+        typeof s === 'object' ? `${s.filename} (score: ${s.score})` : s
+      )
       
       setMessages((prev) => [
         ...prev,

@@ -1,10 +1,9 @@
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status
-from bson import ObjectId
 
 from auth.dependencies import get_current_user
-from database import get_db
-from services.botpress import query_botpress
+from services.embedder import query_documents
+from services.llm import call_openrouter
 
 router = APIRouter(tags=["ai"])
 
@@ -17,15 +16,87 @@ class AskRequest(BaseModel):
 @router.post("/ask")
 def ask_question(payload: AskRequest, current_user: dict = Depends(get_current_user)):
     try:
-        # Query Botpress directly for answer
-        botpress_result = query_botpress(payload.question, current_user["user_id"])
-        
+        user_id = current_user["user_id"]
+        print(f"[Ask] user={user_id} question={payload.question[:60]}")
+
+        # ── 1. Retrieve relevant chunks from Pinecone ──────────────────────────
+        try:
+            matches = query_documents(payload.question, user_id, top_k=payload.top_k)
+        except Exception as e:
+            print(f"[Ask] Pinecone error: {e}")
+            matches = []
+
+        if not matches:
+            return {
+                "answer": (
+                    "I couldn't find any relevant information in your uploaded documents. "
+                    "Please upload a document first and then ask a question about it."
+                ),
+                "sources": [],
+                "provider": "pinecone+openrouter",
+            }
+
+        # ── 2. Build context from top matches ─────────────────────────────────
+        context_parts = []
+        sources = []
+        seen_files = set()
+
+        for match in matches:
+            meta = match.get("metadata", {})
+            text = meta.get("text", "").strip()
+            filename = meta.get("filename", "unknown")
+            score = match.get("score", 0.0)
+
+            if text:
+                context_parts.append(f"[Source: {filename}]\n{text}")
+
+            if filename not in seen_files:
+                sources.append({"filename": filename, "score": round(score, 4)})
+                seen_files.add(filename)
+
+        context = "\n\n---\n\n".join(context_parts)
+
+        # ── 3. Ask the LLM with context ───────────────────────────────────────
+        system_prompt = (
+            "You are a helpful AI assistant. Answer questions strictly based on the "
+            "provided document context. If the answer is not in the context, say so honestly. "
+            "Always cite the source filename when referencing information."
+        )
+
+        user_prompt = (
+            f"Context from uploaded documents:\n\n{context}\n\n"
+            f"Question: {payload.question}\n\n"
+            "Answer based only on the context above:"
+        )
+
+        try:
+            answer = call_openrouter(system_prompt, user_prompt)
+        except Exception as llm_err:
+            print(f"[Ask] LLM error: {llm_err}")
+            # Return the raw context as fallback rather than a 500
+            answer = (
+                f"I found relevant information in your documents but the AI service is "
+                f"temporarily unavailable (all free models are rate-limited). "
+                f"Here is the raw content found:\n\n"
+                + "\n\n".join(
+                    f"• [{s['filename']}]: " + 
+                    next((m.get("metadata", {}).get("text", "")[:300] 
+                          for m in matches 
+                          if m.get("metadata", {}).get("filename") == s["filename"]), "")
+                    for s in sources
+                )
+            )
+
         return {
-            "answer": botpress_result["answer"],
-            "sources": botpress_result["sources"],
-            "conversation_id": botpress_result["conversation_id"],
-            "provider": "botpress"
+            "answer": answer,
+            "sources": sources,
+            "provider": "pinecone+openrouter",
         }
+
     except Exception as e:
-        print(f"Ask error: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        print(f"[Ask] Unexpected error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+

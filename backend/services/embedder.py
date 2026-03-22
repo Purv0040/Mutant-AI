@@ -7,45 +7,42 @@ from sentence_transformers import SentenceTransformer
 # Load environment variables
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
-# Global variables for caching
-_model = None
-_pinecone_client = None
-_index = None
+# Initialize Pinecone
+api_key = os.getenv("PINECONE_API_KEY", "").strip()
+index_name = os.getenv("PINECONE_INDEX_NAME", "").strip()
+host = os.getenv("PINECONE_HOST", "").strip()
 
-def get_model():
-    global _model
-    if _model is None:
-        # BAAI/bge-large-en-v1.5 produces 1024 dimensions
-        _model = SentenceTransformer('BAAI/bge-large-en-v1.5')
-    return _model
+if not api_key:
+    raise RuntimeError("PINECONE_API_KEY is missing in .env")
 
+pc = Pinecone(api_key=api_key)
 
-def get_pinecone_index():
-    global _pinecone_client, _index
-    if _index is None:
-        api_key = os.getenv("PINECONE_API_KEY", "").strip()
-        index_host = os.getenv("PINECONE_HOST", "").strip()
-        
-        if not api_key or not index_host:
-            raise RuntimeError("Pinecone credentials missing in .env")
-        
-        _pinecone_client = Pinecone(api_key=api_key)
-        _index = _pinecone_client.Index(host=index_host)
-    return _index
+if host:
+    index = pc.Index(host=host)
+elif index_name:
+    index = pc.Index(index_name)
+else:
+    raise RuntimeError("Neither PINECONE_HOST nor PINECONE_INDEX_NAME is set in .env")
+
+# Initialize Embedding Model
+# Using the same model as in diagnose.py
+print("Loading embedding model...")
+model = SentenceTransformer('BAAI/bge-large-en-v1.5')
 
 def embed_and_store(chunks, user_id, filename):
-    model = get_model()
-    index = get_pinecone_index()
-    
+    """
+    Embeds text chunks and stores them in Pinecone.
+    """
     vectors = []
     for i, chunk in enumerate(chunks):
         text = chunk.get("text", "")
         if not text:
             continue
-            
+        
+        # Generate embedding
         embedding = model.encode(text).tolist()
         
-        # Consistent ID format: u{user_id}_{filename}_{chunk_index}
+        # Create unique ID for the vector
         vector_id = f"u{user_id}_{filename}_{i}"
         
         vectors.append({
@@ -59,45 +56,59 @@ def embed_and_store(chunks, user_id, filename):
             }
         })
     
+    # Upsert to Pinecone
     if vectors:
-        # Upsert in batches of 100
-        for i in range(0, len(vectors), 100):
-            batch = vectors[i:i + 100]
-            index.upsert(vectors=batch)
-            
+        index.upsert(vectors=vectors)
+    
     return len(vectors)
 
-def delete_document_vectors(user_id, filename):
-    index = get_pinecone_index()
-    # Pinecone doesn't support direct filtering on delete for all index types easily,
-    # but we can use metadata filtering if the index has indexing enabled on that field.
-    # Alternatively, we could prefix IDs.
-    # For now, let's assume we use the metadata filter.
-    index.delete(filter={
-        "user_id": str(user_id),
-        "filename": filename
-    })
-    return True
-
-def count_document_vectors(user_id, filename):
-    index = get_pinecone_index()
-    stats = index.describe_index_stats(filter={
-        "user_id": str(user_id),
-        "filename": filename
-    })
-    return stats.get("total_vector_count", 0)
-
-def query_documents(query, user_id, top_k=5):
-    model = get_model()
-    index = get_pinecone_index()
+def query_documents(question, user_id, top_k=5):
+    """
+    Queries Pinecone for relevant document chunks.
+    """
+    # Generate query embedding
+    query_embedding = model.encode(question).tolist()
     
-    query_embedding = model.encode(query).tolist()
-    
+    # Query Pinecone with filter for user_id
     results = index.query(
         vector=query_embedding,
         top_k=top_k,
-        include_metadata=True,
-        filter={"user_id": str(user_id)}
+        filter={"user_id": str(user_id)},
+        include_metadata=True
     )
     
     return results.get("matches", [])
+
+def count_document_vectors(user_id, filename):
+    """
+    Counts how many vectors exist for a specific document.
+    Note: Pinecone doesn't have a direct "count with filter" for small scales easily,
+    but we can query with a dummy vector and filter.
+    """
+    # Dummy query to count matches
+    dummy_vec = [0.0] * 1024 # Model dimension is 1024 for bge-large
+    results = index.query(
+        vector=dummy_vec,
+        top_k=10000,
+        filter={
+            "user_id": str(user_id),
+            "filename": filename
+        },
+        include_metadata=False
+    )
+    return len(results.get("matches", []))
+
+def delete_document_vectors(user_id, filename):
+    """
+    Deletes all vectors associated with a specific document.
+    """
+    # We can use delete with filter if the index supports it (Pod based or Serverless)
+    try:
+        index.delete(filter={
+            "user_id": str(user_id),
+            "filename": filename
+        })
+        return True
+    except Exception as e:
+        print(f"Error deleting vectors: {e}")
+        return False
