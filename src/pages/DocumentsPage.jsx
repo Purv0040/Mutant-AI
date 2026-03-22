@@ -79,6 +79,39 @@ export default function DocumentsPage() {
 
   return (
     <main className="flex-1 min-h-screen bg-surface p-6 md:p-8">
+      {/* Upload Progress Modal */}
+      {uploading && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full mx-4">
+            <div className="flex flex-col items-center text-center space-y-4">
+              {/* Spinning Icon */}
+              <div className="animate-spin">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 6v6l4 2" />
+                </svg>
+              </div>
+              
+              <div>
+                <h2 className="text-lg font-semibold text-on-surface mb-2">Uploading Document</h2>
+                <p className="text-sm text-on-surface-variant">Please wait while your file is being processed...</p>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="w-full bg-surface-container rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-accent h-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+
+              {/* Progress Percentage */}
+              <p className="text-sm font-medium text-accent">{uploadProgress}%</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-5xl mx-auto space-y-5">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <h1 className="text-2xl font-bold text-on-surface">Upload Documents</h1>
@@ -98,7 +131,7 @@ export default function DocumentsPage() {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="w-full border border-dashed border-outline-variant rounded-card p-8 text-center hover:border-accent hover:bg-accent/5 transition-all disabled:opacity-60"
+            className="w-full border border-dashed border-outline-variant rounded-card p-8 text-center hover:border-accent hover:bg-accent/5 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <div className="flex justify-center mb-3 text-on-surface-variant">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -114,7 +147,6 @@ export default function DocumentsPage() {
 
         {notice && <div className="rounded-card border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div>}
         {error && <div className="rounded-card border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-        {uploading && <div className="rounded-card border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">Uploading document: {uploadProgress}%</div>}
 
         <div className="bg-white rounded-card border border-outline-variant/30 p-4">
           <h2 className="font-semibold text-on-surface mb-3">Your documents</h2>

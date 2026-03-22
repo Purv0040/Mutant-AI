@@ -19,7 +19,7 @@ _index = None
 def get_model():
     global _model
     if _model is None:
-        _model = SentenceTransformer("BAAI/bge-large-en-v1.5")  # 1024 dim to match Pinecone index
+        _model = SentenceTransformer("all-MiniLM-L6-v2")  # 384 dim to match Pinecone index
     return _model
 
 
