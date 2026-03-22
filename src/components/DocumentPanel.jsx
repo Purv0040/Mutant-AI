@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { getDocuments, uploadDocument } from '../api'
+import { deleteDocument, getDocuments, uploadDocument } from '../api'
 
 const typeStyle = {
   PDF: { badge: 'bg-red-100 text-red-700', icon: '📄' },
@@ -19,6 +19,7 @@ export default function DocumentPanel({ onUploaded }) {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [deletingId, setDeletingId] = useState('')
   const [error, setError] = useState('')
   const fileInputRef = useRef(null)
 
@@ -63,6 +64,19 @@ export default function DocumentPanel({ onUploaded }) {
     }
   }
 
+  const handleDelete = async (docId) => {
+    setDeletingId(docId)
+    setError('')
+    try {
+      await deleteDocument(docId)
+      setFiles((prev) => prev.filter((doc) => doc.id !== docId))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setDeletingId('')
+    }
+  }
+
   return (
     <aside className="w-[220px] min-w-[220px] h-full bg-surface-low border-l border-surface-high flex flex-col overflow-hidden">
       {/* Header */}
@@ -97,6 +111,17 @@ export default function DocumentPanel({ onUploaded }) {
                   <span className="text-[10px] text-on-surface-variant">{file.status}</span>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  handleDelete(file.id)
+                }}
+                disabled={deletingId === file.id}
+                className="text-[10px] px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {deletingId === file.id ? '...' : 'Del'}
+              </button>
             </div>
           )
         })}

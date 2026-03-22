@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { getDocuments, uploadDocument } from '../api'
+import { deleteDocument, getDocuments, uploadDocument } from '../api'
 
 function formatType(filename) {
   const ext = filename.split('.').pop()?.toLowerCase() || ''
@@ -14,6 +14,7 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [deletingId, setDeletingId] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const fileInputRef = useRef(null)
@@ -58,6 +59,21 @@ export default function DocumentsPage() {
       setUploading(false)
       setUploadProgress(0)
       event.target.value = ''
+    }
+  }
+
+  const handleDelete = async (docId, filename) => {
+    setDeletingId(docId)
+    setError('')
+    setNotice('')
+    try {
+      await deleteDocument(docId)
+      setNotice(`Deleted ${filename}`)
+      setDocuments((prev) => prev.filter((doc) => doc.id !== docId))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setDeletingId('')
     }
   }
 
@@ -114,9 +130,19 @@ export default function DocumentsPage() {
                     <p className="text-sm font-medium text-on-surface truncate">{doc.filename}</p>
                     <p className="text-xs text-on-surface-variant">Status: {doc.status} • Botpress ID: {doc.botpress_file_id || 'n/a'}</p>
                   </div>
-                  <span className="text-[11px] px-2 py-1 rounded-full bg-surface-container text-on-surface-variant font-medium">
-                    {formatType(doc.filename)}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] px-2 py-1 rounded-full bg-surface-container text-on-surface-variant font-medium">
+                      {formatType(doc.filename)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(doc.id, doc.filename)}
+                      disabled={deletingId === doc.id}
+                      className="text-[11px] px-2 py-1 rounded-full bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {deletingId === doc.id ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
