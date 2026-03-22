@@ -4,8 +4,7 @@ from bson import ObjectId
 
 from auth.dependencies import get_current_user
 from database import get_db
-from services.embedder import query_documents
-from services.llm import get_fast_llm
+from services.botpress import query_botpress
 
 router = APIRouter(tags=["ai"])
 
@@ -18,38 +17,14 @@ class AskRequest(BaseModel):
 @router.post("/ask")
 def ask_question(payload: AskRequest, current_user: dict = Depends(get_current_user)):
     try:
-        matches = query_documents(payload.question, current_user["user_id"], top_k=payload.top_k)
-
-        source_details = []
-        context_blocks = []
-        for m in matches:
-            meta = m.get("metadata", {}) if isinstance(m, dict) else {}
-            filename = meta.get("filename") or meta.get("source") or "unknown"
-            page = meta.get("page", 1)
-            text = meta.get("text", "")
-            source_details.append({"filename": filename, "page": page})
-            context_blocks.append(f"[Source: {filename} | Page: {page}]\n{text}")
-
-        llm = get_fast_llm()
-        prompt = (
-            "You are a strict company knowledge assistant. Answer only from the provided context. "
-            "If answer is missing, say you do not have enough document evidence. "
-            "Always cite source labels with filename and page.\n\n"
-            f"Question: {payload.question}\n\n"
-            "Context:\n"
-            + "\n\n".join(context_blocks)
-        )
-
-        response = llm.invoke(prompt)
-        answer = getattr(response, "content", str(response))
-
-        sources = [f"{s['filename']} (p.{s['page']})" for s in source_details]
-        dedup_sources = list(dict.fromkeys(sources))
-
+        # Query Botpress directly for answer
+        botpress_result = query_botpress(payload.question, current_user["user_id"])
+        
         return {
-            "answer": answer,
-            "sources": dedup_sources,
-            "source_details": source_details,
+            "answer": botpress_result["answer"],
+            "sources": botpress_result["sources"],
+            "conversation_id": botpress_result["conversation_id"],
+            "provider": "botpress"
         }
     except Exception as e:
         print(f"Ask error: {e}")

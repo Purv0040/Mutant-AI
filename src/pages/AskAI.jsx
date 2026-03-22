@@ -20,7 +20,12 @@ export default function AskAI() {
 
     try {
       const data = await askQuestion(question)
-      const sourceChips = (data.source_details || []).map((source) => `${source.filename} · p.${source.page}`)
+      
+      // Handle both old and new response formats
+      const sourceChips = data.source_details 
+        ? (data.source_details || []).map((source) => `${source.filename} · p.${source.page}`)
+        : (data.sources || [])
+      
       setMessages((prev) => [
         ...prev,
         {
@@ -28,6 +33,7 @@ export default function AskAI() {
           role: 'ai',
           text: data.answer,
           sources: sourceChips,
+          provider: data.provider || 'ai',
         },
       ])
     } catch (err) {
@@ -67,6 +73,7 @@ export default function AskAI() {
                 role={msg.role}
                 text={msg.text}
                 sources={msg.sources}
+                provider={msg.provider}
               />
             ))}
             {loading && <p className="text-[12px] text-on-surface-variant">Thinking...</p>}

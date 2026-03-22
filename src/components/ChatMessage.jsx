@@ -1,5 +1,6 @@
-export default function ChatMessage({ role, text, sources }) {
+export default function ChatMessage({ role, text, sources, provider }) {
   const isUser = role === 'user'
+  const isBotpress = provider === 'botpress'
 
   return (
     <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -7,10 +8,17 @@ export default function ChatMessage({ role, text, sources }) {
       <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-[11px] font-semibold mt-0.5 ${
         isUser ? 'bg-accent text-white' : 'bg-surface-container text-on-surface-variant'
       }`}>
-        {isUser ? 'P' : '🧠'}
+        {isUser ? 'P' : isBotpress ? '🤖' : '🧠'}
       </div>
 
       <div className={`flex flex-col gap-2 max-w-[75%] ${isUser ? 'items-end' : 'items-start'}`}>
+        {/* Provider badge for Botpress */}
+        {!isUser && isBotpress && (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-900">
+            ⚡ Botpress Knowledge Base
+          </span>
+        )}
+
         {/* Bubble */}
         <div className={`px-4 py-3 rounded-card text-[14px] leading-relaxed ${
           isUser
@@ -31,7 +39,9 @@ export default function ChatMessage({ role, text, sources }) {
               <span
                 key={i}
                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                  i % 2 === 0
+                  isBotpress
+                    ? 'bg-blue-100 text-blue-900'
+                    : i % 2 === 0
                     ? 'bg-amber-100 text-amber-800'
                     : 'bg-green-100 text-green-800'
                 }`}

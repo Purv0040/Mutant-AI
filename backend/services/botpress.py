@@ -118,3 +118,73 @@ def list_botpress_files():
     if isinstance(payload, list):
         return payload
     return []
+
+
+def query_botpress(question: str, user_id: str) -> dict:
+    """
+    Send a question to Botpress and get an answer from the knowledge base.
+    Uses Botpress Conversation API.
+    """
+    headers = _get_headers()
+    
+    # Create conversation
+    conversation_url = "https://api.botpress.cloud/v1/conversations"
+    conv_payload = {"userId": str(user_id)}
+    conv_response = requests.post(conversation_url, headers=headers, json=conv_payload, timeout=30)
+    conv_response.raise_for_status()
+    
+    conversation_data = conv_response.json()
+    conversation_id = conversation_data.get("id") or conversation_data.get("conversationId")
+    
+    if not conversation_id:
+        raise RuntimeError(f"Failed to create Botpress conversation: {conversation_data}")
+    
+    # Send message to conversation
+    message_url = f"https://api.botpress.cloud/v1/conversations/{conversation_id}/messages"
+    message_payload = {
+        "payload": {
+            "type": "text",
+            "text": question
+        }
+    }
+    
+    msg_response = requests.post(message_url, headers=headers, json=message_payload, timeout=30)
+    msg_response.raise_for_status()
+    
+    # Poll for bot response
+    bot_answer = _poll_for_response(conversation_id, headers)
+    
+    return {
+        "answer": bot_answer,
+        "conversation_id": conversation_id,
+        "sources": ["Botpress Knowledge Base"]
+    }
+
+
+def _poll_for_response(conversation_id: str, headers: dict, max_attempts: int = 10) -> str:
+    """Poll Botpress conversation for bot response."""
+    messages_url = f"https://api.botpress.cloud/v1/conversations/{conversation_id}/messages"
+    
+    for attempt in range(max_attempts):
+        time.sleep(1)  # Wait before polling
+        
+        response = requests.get(messages_url, headers=headers, timeout=30)
+        response.raise_for_status()
+        
+        messages = response.json()
+        if isinstance(messages, dict):
+            messages = messages.get("messages", [])
+        
+        # Get the last bot message
+        for msg in reversed(messages):
+            if msg.get("userId") != "bot_user":  # Bot message
+                payload = msg.get("payload", {})
+                if payload.get("type") == "text":
+                    text = payload.get("text")
+                    if text:
+                        return text
+        
+        if attempt == max_attempts - 1:
+            break
+    
+    return "I could not retrieve a response from Botpress at this time."
