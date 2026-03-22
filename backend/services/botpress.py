@@ -126,12 +126,23 @@ def query_botpress(question: str, user_id: str) -> dict:
     Uses Botpress Conversation API.
     """
     headers = _get_headers()
+    bot_id = os.getenv("BOTPRESS_BOT_ID", "").strip()
     
-    # Create conversation
-    conversation_url = "https://api.botpress.cloud/v1/conversations"
+    if not bot_id:
+        raise RuntimeError("BOTPRESS_BOT_ID is not set in environment variables")
+    
+    # Create conversation with bot ID in URL
+    conversation_url = f"https://api.botpress.cloud/v1/bots/{bot_id}/conversations"
     conv_payload = {"userId": str(user_id)}
-    conv_response = requests.post(conversation_url, headers=headers, json=conv_payload, timeout=30)
-    conv_response.raise_for_status()
+    
+    try:
+        conv_response = requests.post(conversation_url, headers=headers, json=conv_payload, timeout=30)
+        conv_response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        print(f"[Botpress] Conversation creation failed: {e}")
+        print(f"[Botpress] URL: {conversation_url}")
+        print(f"[Botpress] Response: {conv_response.text if conv_response else 'No response'}")
+        raise RuntimeError(f"Failed to create Botpress conversation: {e}")
     
     conversation_data = conv_response.json()
     conversation_id = conversation_data.get("id") or conversation_data.get("conversationId")
@@ -140,7 +151,7 @@ def query_botpress(question: str, user_id: str) -> dict:
         raise RuntimeError(f"Failed to create Botpress conversation: {conversation_data}")
     
     # Send message to conversation
-    message_url = f"https://api.botpress.cloud/v1/conversations/{conversation_id}/messages"
+    message_url = f"https://api.botpress.cloud/v1/bots/{bot_id}/conversations/{conversation_id}/messages"
     message_payload = {
         "payload": {
             "type": "text",
@@ -148,11 +159,15 @@ def query_botpress(question: str, user_id: str) -> dict:
         }
     }
     
-    msg_response = requests.post(message_url, headers=headers, json=message_payload, timeout=30)
-    msg_response.raise_for_status()
+    try:
+        msg_response = requests.post(message_url, headers=headers, json=message_payload, timeout=30)
+        msg_response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        print(f"[Botpress] Message send failed: {e}")
+        raise
     
     # Poll for bot response
-    bot_answer = _poll_for_response(conversation_id, headers)
+    bot_answer = _poll_for_response(conversation_id, bot_id, headers)
     
     return {
         "answer": bot_answer,
@@ -161,15 +176,21 @@ def query_botpress(question: str, user_id: str) -> dict:
     }
 
 
-def _poll_for_response(conversation_id: str, headers: dict, max_attempts: int = 10) -> str:
+def _poll_for_response(conversation_id: str, bot_id: str, headers: dict, max_attempts: int = 10) -> str:
     """Poll Botpress conversation for bot response."""
-    messages_url = f"https://api.botpress.cloud/v1/conversations/{conversation_id}/messages"
+    messages_url = f"https://api.botpress.cloud/v1/bots/{bot_id}/conversations/{conversation_id}/messages"
     
     for attempt in range(max_attempts):
         time.sleep(1)  # Wait before polling
         
-        response = requests.get(messages_url, headers=headers, timeout=30)
-        response.raise_for_status()
+        try:
+            response = requests.get(messages_url, headers=headers, timeout=30)
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            print(f"[Botpress] Poll attempt {attempt+1}/{max_attempts} failed: {e}")
+            if attempt == max_attempts - 1:
+                break
+            continue
         
         messages = response.json()
         if isinstance(messages, dict):
