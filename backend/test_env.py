@@ -1,7 +1,8 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv("c:/Users/Digisha/Desktop/project/Mutant-AI/backend/.env")
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 print(f"KEY: '{os.getenv('PINECONE_API_KEY')}'")
 print(f"HOST: '{os.getenv('PINECONE_HOST')}'")

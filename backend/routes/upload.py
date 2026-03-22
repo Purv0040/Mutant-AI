@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from auth.dependencies import get_current_user
 from database import get_db
 from services.botpress import delete_file_from_botpress, upload_file_to_botpress
-from services.embedder import embed_and_store
+from services.embedder import count_document_vectors, delete_document_vectors, embed_and_store
 from services.parser import parse_file
 
 router = APIRouter(tags=["documents"])
@@ -36,10 +36,49 @@ def upload_document(
         target_name = f"{user_prefix}_{Path(file.filename).name}"
         destination = UPLOAD_DIR / target_name
 
+        user_obj_id = ObjectId(user_id) if len(str(user_id)) == 24 else user_id
+        existing_docs = list(db["documents"].find({
+            "user_id": user_obj_id,
+            "filename": Path(file.filename).name,
+        }))
+
+        if existing_docs:
+            try:
+                delete_document_vectors(user_id, Path(file.filename).name)
+            except Exception as exc:
+                print(f"Vector cleanup failed for re-upload: {exc}")
+
+            for existing_doc in existing_docs:
+                if existing_doc.get("botpress_file_id"):
+                    try:
+                        delete_file_from_botpress(existing_doc["botpress_file_id"])
+                    except Exception as exc:
+                        print(f"[Botpress] cleanup failed before re-upload: {exc}")
+
+                old_path = existing_doc.get("file_path")
+                if old_path and os.path.exists(old_path):
+                    try:
+                        os.remove(old_path)
+                    except Exception as exc:
+                        print(f"Local file cleanup failed before re-upload: {exc}")
+
+            db["documents"].delete_many({
+                "user_id": user_obj_id,
+                "filename": Path(file.filename).name,
+            })
+
         with destination.open("wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
         chunks = parse_file(str(destination), Path(file.filename).name)
+        if not chunks:
+            if destination.exists():
+                destination.unlink(missing_ok=True)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No readable text found in this document",
+            )
+
         stored = embed_and_store(chunks, user_id, Path(file.filename).name)
 
         botpress_result = {"botpress_file_id": None, "botpress_status": "not_indexed"}
@@ -48,11 +87,11 @@ def upload_document(
         except Exception as exc:
             print(f"[Botpress] upload failed: {exc}")
 
-        user_obj_id = ObjectId(user_id) if len(str(user_id)) == 24 else user_id
         doc = {
             "user_id": user_obj_id,
             "filename": Path(file.filename).name,
             "file_path": str(destination),
+            "chunks_stored": stored,
             "botpress_file_id": botpress_result.get("botpress_file_id"),
             "status": "indexed",
             "uploaded_at": datetime.utcnow(),
@@ -92,6 +131,7 @@ def get_documents(current_user: dict = Depends(get_current_user)):
                 "file_path": d["file_path"],
                 "category": d.get("category"),
                 "summary": d.get("summary"),
+                "chunks_stored": d.get("chunks_stored"),
                 "botpress_file_id": d.get("botpress_file_id"),
                 "status": d.get("status"),
                 "uploaded_at": d["uploaded_at"].isoformat() if d.get("uploaded_at") else None,
@@ -100,6 +140,39 @@ def get_documents(current_user: dict = Depends(get_current_user)):
         ]
     except Exception as e:
         print(f"Get documents error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.get("/documents/chunk-counts")
+def get_document_chunk_counts(current_user: dict = Depends(get_current_user)):
+    try:
+        db = get_db()
+        user_id_raw = current_user["user_id"]
+        user_id = ObjectId(user_id_raw) if len(str(user_id_raw)) == 24 else user_id_raw
+
+        docs = list(db["documents"].find({"user_id": user_id}, {"filename": 1, "chunks_stored": 1}))
+        result = []
+        for doc in docs:
+            filename = doc.get("filename")
+            pinecone_chunks = 0
+            error = None
+            try:
+                pinecone_chunks = count_document_vectors(user_id_raw, filename)
+            except Exception as exc:
+                error = str(exc)
+
+            result.append({
+                "document_id": str(doc.get("_id")),
+                "filename": filename,
+                "chunks_stored": doc.get("chunks_stored"),
+                "pinecone_chunks": pinecone_chunks,
+                "verified": pinecone_chunks > 0,
+                "error": error,
+            })
+
+        return result
+    except Exception as e:
+        print(f"Get chunk counts error: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 

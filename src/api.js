@@ -93,6 +93,10 @@ export function getDocuments() {
   return request('/documents')
 }
 
+export function getDocumentChunkCounts() {
+  return request('/documents/chunk-counts')
+}
+
 export function askQuestion(question, top_k = 5) {
   return request('/ask', {
     method: 'POST',

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { deleteDocument, getDocuments, uploadDocument } from '../api'
+import { deleteDocument, getDocumentChunkCounts, getDocuments, uploadDocument } from '../api'
 
 const typeStyle = {
   PDF: { badge: 'bg-red-100 text-red-700', icon: '📄' },
@@ -20,6 +20,8 @@ export default function DocumentPanel({ onUploaded }) {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [deletingId, setDeletingId] = useState('')
+  const [chunkCountByDocId, setChunkCountByDocId] = useState({})
+  const [checkingChunks, setCheckingChunks] = useState(false)
   const [error, setError] = useState('')
   const fileInputRef = useRef(null)
 
@@ -36,8 +38,28 @@ export default function DocumentPanel({ onUploaded }) {
     }
   }
 
+  const loadChunkCounts = async () => {
+    setCheckingChunks(true)
+    try {
+      const data = await getDocumentChunkCounts()
+      const next = {}
+      data.forEach((item) => {
+        next[item.document_id] = item
+      })
+      setChunkCountByDocId(next)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setCheckingChunks(false)
+    }
+  }
+
   useEffect(() => {
-    loadDocuments()
+    const init = async () => {
+      await loadDocuments()
+      await loadChunkCounts()
+    }
+    init()
   }, [])
 
   const handleSelectFile = async (event) => {
@@ -52,6 +74,7 @@ export default function DocumentPanel({ onUploaded }) {
         onProgress: (percent) => setUploadProgress(percent),
       })
       await loadDocuments()
+      await loadChunkCounts()
       if (onUploaded) {
         onUploaded(result.filename)
       }
@@ -70,6 +93,11 @@ export default function DocumentPanel({ onUploaded }) {
     try {
       await deleteDocument(docId)
       setFiles((prev) => prev.filter((doc) => doc.id !== docId))
+      setChunkCountByDocId((prev) => {
+        const next = { ...prev }
+        delete next[docId]
+        return next
+      })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -82,9 +110,19 @@ export default function DocumentPanel({ onUploaded }) {
       {/* Header */}
       <div className="px-4 py-4 border-b border-surface-high flex items-center justify-between">
         <span className="font-semibold text-[14px] text-on-surface">Documents</span>
-        <span className="bg-accent text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
-          {files.length}
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={loadChunkCounts}
+            disabled={checkingChunks}
+            className="text-[10px] px-2 py-1 rounded bg-surface-container border border-surface-high hover:bg-surface-high disabled:opacity-60"
+          >
+            {checkingChunks ? 'Checking...' : 'Verify'}
+          </button>
+          <span className="bg-accent text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+            {files.length}
+          </span>
+        </div>
       </div>
 
       {/* File list */}
@@ -109,6 +147,11 @@ export default function DocumentPanel({ onUploaded }) {
                     {type}
                   </span>
                   <span className="text-[10px] text-on-surface-variant">{file.status}</span>
+                  {chunkCountByDocId[file.id] && (
+                    <span className="text-[10px] text-on-surface-variant">
+                      {chunkCountByDocId[file.id].pinecone_chunks} chunks
+                    </span>
+                  )}
                 </div>
               </div>
               <button
