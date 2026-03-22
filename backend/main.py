@@ -9,6 +9,8 @@ from routes.ask import router as ask_router
 from routes.categorize import router as categorize_router
 from routes.summarize import router as summarize_router
 from routes.upload import router as upload_router
+from routes.rag import router as rag_router
+
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
@@ -30,6 +32,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(upload_router)
+app.include_router(rag_router)
 app.include_router(ask_router)
 app.include_router(summarize_router)
 app.include_router(categorize_router)

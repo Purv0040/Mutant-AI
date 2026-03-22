@@ -1,140 +1,103 @@
 import os
-import re
-import uuid
 from pathlib import Path
-from typing import Any, Dict, List
-
 from dotenv import load_dotenv
 from pinecone import Pinecone
 from sentence_transformers import SentenceTransformer
 
+# Load environment variables
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY", "").strip()
-PINECONE_HOST = os.getenv("PINECONE_HOST", "").strip() or None
-PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "mutant-ai").strip()
-
+# Global variables for caching
 _model = None
+_pinecone_client = None
 _index = None
-
-
-def _id_safe_filename(filename: str) -> str:
-    # Keep IDs readable and queryable by replacing uncommon characters.
-    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", filename or "document")
-    return cleaned[:120]
-
-
-def _vector_id_prefix(user_id: int, filename: str) -> str:
-    return f"{user_id}:{_id_safe_filename(filename)}:"
-
 
 def get_model():
     global _model
     if _model is None:
-        _model = SentenceTransformer("all-MiniLM-L6-v2")  # 384 dim to match Pinecone index
+        # BAAI/bge-large-en-v1.5 produces 1024 dimensions
+        _model = SentenceTransformer('BAAI/bge-large-en-v1.5')
     return _model
 
 
-def get_index():
-    global _index
+def get_pinecone_index():
+    global _pinecone_client, _index
     if _index is None:
         api_key = os.getenv("PINECONE_API_KEY", "").strip()
-        if not api_key:
-            raise RuntimeError("PINECONE_API_KEY is missing in backend/.env")
-
-        pc = Pinecone(api_key=api_key)
-
-        if PINECONE_HOST:
-            _index = pc.Index(host=PINECONE_HOST)
-        else:
-            if not PINECONE_INDEX_NAME:
-                raise RuntimeError("PINECONE_INDEX_NAME is missing in backend/.env")
-            _index = pc.Index(PINECONE_INDEX_NAME)
-
+        index_host = os.getenv("PINECONE_HOST", "").strip()
+        
+        if not api_key or not index_host:
+            raise RuntimeError("Pinecone credentials missing in .env")
+        
+        _pinecone_client = Pinecone(api_key=api_key)
+        _index = _pinecone_client.Index(host=index_host)
     return _index
 
-
-# 🔹 STORE DATA
-def embed_and_store(chunks: List[Dict[str, Any]], user_id: int, filename: str):
-    if not chunks:
-        return 0
-
+def embed_and_store(chunks, user_id, filename):
     model = get_model()
-    index = get_index()
-
-    texts = [c["text"] for c in chunks]
-    vectors = model.encode(texts, normalize_embeddings=True)
-
-    data = []
-    prefix = _vector_id_prefix(user_id, filename)
-    for i, vec in enumerate(vectors):
-        data.append({
-            "id": f"{prefix}{i:06d}:{uuid.uuid4().hex[:12]}",
-            "values": vec.tolist(),
+    index = get_pinecone_index()
+    
+    vectors = []
+    for i, chunk in enumerate(chunks):
+        text = chunk.get("text", "")
+        if not text:
+            continue
+            
+        embedding = model.encode(text).tolist()
+        
+        # Consistent ID format: u{user_id}_{filename}_{chunk_index}
+        vector_id = f"u{user_id}_{filename}_{i}"
+        
+        vectors.append({
+            "id": vector_id,
+            "values": embedding,
             "metadata": {
-                "text": texts[i],
                 "user_id": str(user_id),
-                "filename": filename
+                "filename": filename,
+                "text": text,
+                "chunk_index": i
             }
         })
+    
+    if vectors:
+        # Upsert in batches of 100
+        for i in range(0, len(vectors), 100):
+            batch = vectors[i:i + 100]
+            index.upsert(vectors=batch)
+            
+    return len(vectors)
 
-    index.upsert(vectors=data)
-    return len(data)
-
-
-def delete_document_vectors(user_id: int, filename: str) -> bool:
-    """Delete vectors for a previously indexed document to support safe re-uploads."""
-    index = get_index()
-
-    prefix = _vector_id_prefix(user_id, filename)
-    ids_to_delete: List[str] = []
-
-    try:
-        for batch in index.list(prefix=prefix, limit=100):
-            if not batch:
-                continue
-            ids_to_delete.extend(batch)
-    except Exception as exc:
-        print(f"Prefix list delete fallback due to error: {exc}")
-
-    if ids_to_delete:
-        for start in range(0, len(ids_to_delete), 1000):
-            index.delete(ids=ids_to_delete[start:start + 1000])
-        return True
-
+def delete_document_vectors(user_id, filename):
+    index = get_pinecone_index()
+    # Pinecone doesn't support direct filtering on delete for all index types easily,
+    # but we can use metadata filtering if the index has indexing enabled on that field.
+    # Alternatively, we could prefix IDs.
+    # For now, let's assume we use the metadata filter.
     index.delete(filter={
-        "user_id": {"$eq": str(user_id)},
-        "filename": {"$eq": filename},
+        "user_id": str(user_id),
+        "filename": filename
     })
     return True
 
+def count_document_vectors(user_id, filename):
+    index = get_pinecone_index()
+    stats = index.describe_index_stats(filter={
+        "user_id": str(user_id),
+        "filename": filename
+    })
+    return stats.get("total_vector_count", 0)
 
-def count_document_vectors(user_id: int, filename: str) -> int:
-    """Count vectors for a document using ID prefix listing (Starter-compatible)."""
-    index = get_index()
-    prefix = _vector_id_prefix(user_id, filename)
-    total = 0
-
-    for batch in index.list(prefix=prefix, limit=100):
-        if not batch:
-            continue
-        total += len(batch)
-
-    return total
-
-
-# 🔹 QUERY DATA
-def query_documents(question: str, user_id: int, top_k: int = 5):
+def query_documents(query, user_id, top_k=5):
     model = get_model()
-    index = get_index()
-
-    query_vec = model.encode(question, normalize_embeddings=True).tolist()
-
-    res = index.query(
-        vector=query_vec,
+    index = get_pinecone_index()
+    
+    query_embedding = model.encode(query).tolist()
+    
+    results = index.query(
+        vector=query_embedding,
         top_k=top_k,
         include_metadata=True,
-        filter={"user_id": {"$eq": str(user_id)}}
+        filter={"user_id": str(user_id)}
     )
-
-    return res.matches   # ✅ correct
+    
+    return results.get("matches", [])
