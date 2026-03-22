@@ -22,6 +22,7 @@ export default function Categorization() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState('')
   const fileInputRef = useRef(null)
 
@@ -54,9 +55,12 @@ export default function Categorization() {
     if (!file) return
 
     setUploading(true)
+    setUploadProgress(0)
     setError('')
     try {
-      const uploaded = await uploadDocument(file)
+      const uploaded = await uploadDocument(file, {
+        onProgress: (percent) => setUploadProgress(percent),
+      })
       const categorized = await categorizeDoc(uploaded.filename)
       await fetchRows()
 
@@ -77,6 +81,7 @@ export default function Categorization() {
       setError(err.message)
     } finally {
       setUploading(false)
+      setUploadProgress(0)
       event.target.value = ''
     }
   }
@@ -115,6 +120,9 @@ export default function Categorization() {
           <p className="text-[13px] text-on-surface-variant">
             AI reads every uploaded file and assigns category + extracts key fields
           </p>
+          {uploading && (
+            <p className="text-[13px] text-blue-700 mt-1">Uploading document: {uploadProgress}%</p>
+          )}
         </div>
 
         {/* Drop zone */}

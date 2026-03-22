@@ -18,6 +18,7 @@ export default function DocumentPanel({ onUploaded }) {
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState('')
   const fileInputRef = useRef(null)
 
@@ -43,9 +44,12 @@ export default function DocumentPanel({ onUploaded }) {
     if (!file) return
 
     setUploading(true)
+    setUploadProgress(0)
     setError('')
     try {
-      const result = await uploadDocument(file)
+      const result = await uploadDocument(file, {
+        onProgress: (percent) => setUploadProgress(percent),
+      })
       await loadDocuments()
       if (onUploaded) {
         onUploaded(result.filename)
@@ -54,6 +58,7 @@ export default function DocumentPanel({ onUploaded }) {
       setError(err.message)
     } finally {
       setUploading(false)
+      setUploadProgress(0)
       event.target.value = ''
     }
   }
@@ -100,6 +105,9 @@ export default function DocumentPanel({ onUploaded }) {
 
       {/* Drop zone */}
       <div className="p-3">
+        {uploading && (
+          <p className="text-[11px] text-blue-700 mb-2">Uploading document: {uploadProgress}%</p>
+        )}
         <input
           ref={fileInputRef}
           type="file"

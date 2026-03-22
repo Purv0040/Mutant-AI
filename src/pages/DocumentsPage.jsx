@@ -13,6 +13,7 @@ export default function DocumentsPage() {
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const fileInputRef = useRef(null)
@@ -39,11 +40,14 @@ export default function DocumentsPage() {
     if (!file) return
 
     setUploading(true)
+    setUploadProgress(0)
     setError('')
     setNotice('')
 
     try {
-      const result = await uploadDocument(file)
+      const result = await uploadDocument(file, {
+        onProgress: (percent) => setUploadProgress(percent),
+      })
       const bpStatus = result.botpress_status || 'unknown'
       const bpId = result.botpress_file_id || 'not returned'
       setNotice(`Uploaded ${result.filename}. Botpress status: ${bpStatus}. Botpress file id: ${bpId}`)
@@ -52,6 +56,7 @@ export default function DocumentsPage() {
       setError(err.message)
     } finally {
       setUploading(false)
+      setUploadProgress(0)
       event.target.value = ''
     }
   }
@@ -93,6 +98,7 @@ export default function DocumentsPage() {
 
         {notice && <div className="rounded-card border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div>}
         {error && <div className="rounded-card border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+        {uploading && <div className="rounded-card border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">Uploading document: {uploadProgress}%</div>}
 
         <div className="bg-white rounded-card border border-outline-variant/30 p-4">
           <h2 className="font-semibold text-on-surface mb-3">Your documents</h2>

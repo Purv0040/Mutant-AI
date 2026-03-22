@@ -42,9 +42,47 @@ export function register(payload) {
   })
 }
 
-export function uploadDocument(file) {
+export function uploadDocument(file, options = {}) {
   const formData = new FormData()
   formData.append('file', file)
+
+  if (typeof options.onProgress === 'function') {
+    const token = localStorage.getItem('mutant_token')
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `${API_BASE_URL}/upload`)
+
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+      }
+
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable) return
+        const percent = Math.min(100, Math.round((event.loaded / event.total) * 100))
+        options.onProgress(percent)
+      }
+
+      xhr.onload = () => {
+        const contentType = xhr.getResponseHeader('content-type') || ''
+        const data = contentType.includes('application/json')
+          ? JSON.parse(xhr.responseText || '{}')
+          : xhr.responseText
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(data)
+          return
+        }
+
+        const detail = typeof data === 'object' && data?.detail ? data.detail : 'Request failed'
+        reject(new Error(detail))
+      }
+
+      xhr.onerror = () => reject(new Error('Network error during upload'))
+      xhr.send(formData)
+    })
+  }
+
   return request('/upload', {
     method: 'POST',
     body: formData,
