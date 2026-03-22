@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,7 +10,7 @@ from routes.categorize import router as categorize_router
 from routes.summarize import router as summarize_router
 from routes.upload import router as upload_router
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 app = FastAPI(title="Mutant AI Backend", version="0.1.0")
 
