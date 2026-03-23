@@ -2,6 +2,7 @@ from pydantic import BaseModel, EmailStr, Field
 from fastapi import APIRouter, HTTPException, status, Depends
 from datetime import datetime
 from bson import ObjectId
+import re
 
 from auth.utils import create_access_token, hash_password, verify_password
 from auth.dependencies import get_current_user
@@ -30,16 +31,22 @@ class UpdateProfileRequest(BaseModel):
 def register(payload: RegisterRequest):
     try:
         db = get_db()
+        normalized_email = payload.email.strip().lower()
         
         # Check if email already exists
-        existing = db["users"].find_one({"email": payload.email})
+        existing = db["users"].find_one({
+            "email": {
+                "$regex": f"^{re.escape(normalized_email)}$",
+                "$options": "i",
+            }
+        })
         if existing:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
 
         # Create new user document
         user_doc = {
             "name": payload.name,
-            "email": payload.email,
+            "email": normalized_email,
             "hashed_password": hash_password(payload.password),
             "created_at": datetime.utcnow()
         }
@@ -48,7 +55,7 @@ def register(payload: RegisterRequest):
         user_id = str(result.inserted_id)
         
         # Create access token
-        token = create_access_token({"sub": payload.email, "user_id": user_id, "username": payload.name})
+        token = create_access_token({"sub": normalized_email, "user_id": user_id, "username": payload.name})
         
         return {
             "access_token": token,
@@ -56,7 +63,7 @@ def register(payload: RegisterRequest):
             "user": {
                 "id": user_id,
                 "name": payload.name,
-                "email": payload.email
+                "email": normalized_email
             }
         }
     except HTTPException:
@@ -70,16 +77,22 @@ def register(payload: RegisterRequest):
 def login(payload: LoginRequest):
     try:
         db = get_db()
+        normalized_email = payload.email.strip().lower()
         
-        # Find user by email
-        user = db["users"].find_one({"email": payload.email})
+        # Find user by email (case-insensitive) so older mixed-case records still work.
+        user = db["users"].find_one({
+            "email": {
+                "$regex": f"^{re.escape(normalized_email)}$",
+                "$options": "i",
+            }
+        })
         if not user or not verify_password(payload.password, user["hashed_password"]):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
         user_id = str(user["_id"])
         
         # Create access token
-        token = create_access_token({"sub": payload.email, "user_id": user_id, "username": user["name"]})
+        token = create_access_token({"sub": user["email"], "user_id": user_id, "username": user["name"]})
         
         return {
             "access_token": token,
@@ -127,10 +140,17 @@ def update_profile(payload: UpdateProfileRequest, current_user: dict = Depends(g
     try:
         db = get_db()
         user_id = ObjectId(current_user["user_id"]) if len(str(current_user["user_id"])) == 24 else current_user["user_id"]
+        normalized_email = payload.email.strip().lower()
         
         # Check if new email is already taken by another user
-        if payload.email != current_user["email"]:
-            existing = db["users"].find_one({"email": payload.email, "_id": {"$ne": user_id}})
+        if normalized_email != str(current_user["email"]).strip().lower():
+            existing = db["users"].find_one({
+                "email": {
+                    "$regex": f"^{re.escape(normalized_email)}$",
+                    "$options": "i",
+                },
+                "_id": {"$ne": user_id}
+            })
             if existing:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already in use")
         
@@ -139,7 +159,7 @@ def update_profile(payload: UpdateProfileRequest, current_user: dict = Depends(g
             {"_id": user_id},
             {"$set": {
                 "name": payload.name,
-                "email": payload.email,
+                "email": normalized_email,
                 "updated_at": datetime.utcnow()
             }}
         )
@@ -149,7 +169,7 @@ def update_profile(payload: UpdateProfileRequest, current_user: dict = Depends(g
         
         # Create new token with updated info
         token = create_access_token({
-            "sub": payload.email,
+            "sub": normalized_email,
             "user_id": str(user_id),
             "username": payload.name
         })

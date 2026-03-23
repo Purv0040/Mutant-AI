@@ -57,29 +57,6 @@ const DashboardSidebar = () => {
           <span>Ask AI</span>
         </Link>
 
-        {isActive('/ask-ai') && (
-          <>
-            <div className="pt-6 pb-2 px-4">
-              <span className="text-[10px] font-label font-bold text-on-surface-variant/40 uppercase tracking-widest">
-                Recent Activity
-              </span>
-            </div>
-            {/* History Items */}
-            <Link to="#" className="flex flex-col gap-1 px-4 py-3 rounded-xl hover:bg-indigo-50/30 transition-all group">
-              <span className="text-sm font-medium text-on-surface truncate">Q4 Strategy Analysis</span>
-              <span className="text-[10px] text-on-surface-variant/60">2 hours ago</span>
-            </Link>
-            <Link to="#" className="flex flex-col gap-1 px-4 py-3 rounded-xl hover:bg-indigo-50/30 transition-all group">
-              <span className="text-sm font-medium text-on-surface truncate">Internal Wiki: HR Policies</span>
-              <span className="text-[10px] text-on-surface-variant/60">Yesterday</span>
-            </Link>
-            <Link to="#" className="flex flex-col gap-1 px-4 py-3 rounded-xl hover:bg-indigo-50/30 transition-all group">
-              <span className="text-sm font-medium text-on-surface truncate">Revenue Forecast 2025</span>
-              <span className="text-[10px] text-on-surface-variant/60">Nov 12</span>
-            </Link>
-          </>
-        )}
-
         {/* Documents */}
         <Link
           to="/summarization"

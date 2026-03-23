@@ -147,19 +147,6 @@ const DashboardPage = () => {
         <div className="lg:col-span-4 space-y-6">
           <h2 className="text-2xl font-bold font-headline tracking-tight text-on-surface">Accelerators</h2>
           <div className="grid grid-cols-1 gap-4">
-            <button 
-              className="flex items-center justify-between p-6 bg-primary text-white rounded-lg transition-all hover:opacity-90 active:scale-95 group shadow-lg shadow-indigo-200"
-              onClick={() => navigate('/ask')}
-            >
-              <div className="flex items-center gap-4">
-                <span className="material-symbols-outlined text-3xl">add_circle</span>
-                <div className="text-left">
-                  <div className="font-bold">New Chat</div>
-                  <div className="text-xs opacity-70">Initialize Intelligence</div>
-                </div>
-              </div>
-              <span className="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
-            </button>
             <button
               className="flex items-center justify-between p-6 bg-surface-container-highest text-on-surface rounded-lg transition-all hover:bg-surface-container-high active:scale-95 group"
               onClick={() => navigate('/documents')}
