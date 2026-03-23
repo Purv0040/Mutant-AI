@@ -16,7 +16,7 @@ const HeroSection = () => {
           </p>
           <div className="flex flex-wrap gap-4">
             <Link
-              to="/signup"
+              to="/role-selection"
               className="bg-mutant-gradient text-white px-8 py-4 rounded-xl font-headline font-bold text-lg shadow-xl shadow-indigo-500/20 active:scale-95 transition-transform"
             >
               Get Started

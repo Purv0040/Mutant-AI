@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getDocuments } from '../api';
 
 const TeamPage = () => {
   // State management
@@ -24,6 +25,14 @@ const TeamPage = () => {
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [selectedPermissionRole, setSelectedPermissionRole] = useState(null);
   const [showLinksPanel, setShowLinksPanel] = useState(false);
+  const [uploadRequests, setUploadRequests] = useState([]);
+  const [detailedDepartment, setDetailedDepartment] = useState(null);
+  const [departmentDocs, setDepartmentDocs] = useState([]);
+
+  useEffect(() => {
+    const requests = JSON.parse(localStorage.getItem('mutant_upload_requests') || '[]');
+    setUploadRequests(requests);
+  }, []);
   const [permissions, setPermissions] = useState({
     Admin: {
       viewAll: true,
@@ -200,6 +209,32 @@ const TeamPage = () => {
     ));
   };
 
+  const handleApproveRequest = (id) => {
+    const updated = uploadRequests.map(req => req.id === id ? { ...req, status: 'Approved' } : req);
+    setUploadRequests(updated);
+    localStorage.setItem('mutant_upload_requests', JSON.stringify(updated));
+  };
+
+  const handleRejectRequest = (id) => {
+    const updated = uploadRequests.map(req => req.id === id ? { ...req, status: 'Rejected' } : req);
+    setUploadRequests(updated);
+    localStorage.setItem('mutant_upload_requests', JSON.stringify(updated));
+  };
+
+  const handleDepartmentClick = async (deptName) => {
+    setDetailedDepartment(deptName);
+    try {
+      const docs = await getDocuments();
+      setDepartmentDocs(Array.isArray(docs) ? docs.filter(d => 
+        String(d.category || '').toLowerCase() === deptName.toLowerCase() || 
+        String(d.accessMode || '').toLowerCase() === deptName.toLowerCase()
+      ) : []);
+    } catch (err) {
+      console.error(err);
+      setDepartmentDocs([]);
+    }
+  };
+
   // Calculate team statistics
   const activeCount = teamMembers.filter(m => m.status === 'Active').length;
   const inactiveCount = teamMembers.filter(m => m.status === 'Inactive').length;
@@ -239,10 +274,11 @@ const TeamPage = () => {
               { id: 'overview', label: 'Overview' },
               { id: 'roles', label: 'Roles' },
               { id: 'permissions', label: 'Permissions' },
+              { id: 'requests', label: 'Upload Requests' },
             ].map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => { setActiveTab(tab.id); setDetailedDepartment(null); }}
                 className={`px-6 py-4 text-sm font-semibold uppercase tracking-wider transition-all border-b-2 ${
                   activeTab === tab.id
                     ? 'text-indigo-600 border-indigo-600'
@@ -260,7 +296,7 @@ const TeamPage = () => {
       <div className="px-8 pb-12 overflow-y-auto flex-1">
         
         {/* OVERVIEW TAB */}
-        {activeTab === 'overview' && (
+        {activeTab === 'overview' && !detailedDepartment && (
           <>
             {/* Enhanced Statistics Row */}
             <div className="grid grid-cols-12 gap-6 mb-8 mt-8">
@@ -333,7 +369,7 @@ const TeamPage = () => {
               <h3 className="text-lg font-bold text-on-surface font-headline mb-4">Teams by Department</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {departments.map(dept => (
-                  <div key={dept.name} className={`${dept.color} p-4 rounded-lg border border-slate-200 hover:shadow-md transition-shadow cursor-pointer`}>
+                  <div key={dept.name} onClick={() => handleDepartmentClick(dept.name)} className={`${dept.color} p-4 rounded-lg border border-slate-200 hover:shadow-md transition-shadow cursor-pointer`}>
                     <div className="text-2xl mb-2">{dept.icon}</div>
                     <p className="font-bold text-sm text-on-surface">{dept.name}</p>
                     <p className="text-xs text-slate-500 mt-1">{dept.members} members</p>
@@ -394,7 +430,7 @@ const TeamPage = () => {
         )}
 
         {/* TEAM MEMBERS TABLE & GRID */}
-        {(activeTab === 'overview' || activeTab === 'roles') && (
+        {(activeTab === 'overview' || activeTab === 'roles') && !detailedDepartment && (
           <div className="bg-surface-container-low rounded-lg p-2 mt-8">
             <div className="bg-surface-container-lowest rounded-lg shadow-xl shadow-slate-200/50 overflow-hidden">
               
@@ -722,6 +758,51 @@ const TeamPage = () => {
           </div>
         )}
 
+        {/* DETAILED DEPARTMENT VIEW */}
+        {activeTab === 'overview' && detailedDepartment && (
+          <div className="mt-8">
+             <button onClick={() => setDetailedDepartment(null)} className="mb-4 text-indigo-600 font-bold flex items-center gap-2 hover:underline"><span className="material-symbols-outlined">arrow_back</span> Back to Overview</button>
+             <h2 className="text-3xl font-bold mb-6 font-headline">{detailedDepartment} Department</h2>
+             
+             {/* Show Department Members */}
+             <h3 className="text-xl font-bold mb-4 font-headline text-slate-800">Department Members</h3>
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+               {teamMembers.filter(m => m.department === detailedDepartment).length === 0 && (
+                 <p className="text-slate-500 text-sm col-span-3">No members found in this department.</p>
+               )}
+               {teamMembers.filter(m => m.department === detailedDepartment).map(member => (
+                 <div key={member.id} onClick={() => handleMemberClick(member)} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow">
+                    <img src={member.avatar} alt="avatar" className="w-14 h-14 rounded-full border-2 border-indigo-100" />
+                    <div>
+                      <p className="font-bold text-sm text-slate-900">{member.name}</p>
+                      <p className="text-xs font-semibold text-indigo-600">{member.role}</p>
+                      <p className="text-xs text-slate-500 truncate">{member.email}</p>
+                    </div>
+                 </div>
+               ))}
+             </div>
+             
+             {/* Show Department Documents */}
+             <h3 className="text-xl font-bold mb-4 font-headline text-slate-800">Department Documents</h3>
+             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-2">
+               {departmentDocs.length === 0 ? <p className="text-slate-500 p-4 text-sm font-medium">No documents assigned to this department yet.</p> : departmentDocs.map(doc => (
+                 <div key={doc.id} className="flex justify-between items-center p-4 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors">
+                   <div className="flex items-center gap-4">
+                     <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-500">
+                       <span className="material-symbols-outlined text-lg">description</span>
+                     </div>
+                     <div>
+                       <span className="font-bold text-sm text-slate-700 block">{doc.filename || 'Unnamed Document'}</span>
+                       <span className="text-xs text-slate-400 block mt-0.5">Uploaded {new Date(doc.uploaded_at || Date.now()).toLocaleDateString()}</span>
+                     </div>
+                   </div>
+                   <span className="text-xs font-bold text-indigo-700 px-3 py-1 bg-indigo-50 rounded-full">{doc.accessMode || doc.category || detailedDepartment}</span>
+                 </div>
+               ))}
+             </div>
+          </div>
+        )}
+
         {/* PERMISSIONS TAB */}
         {activeTab === 'permissions' && (
           <div className="bg-white rounded-lg mt-8">
@@ -839,6 +920,73 @@ const TeamPage = () => {
                 </table>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* UPLOAD REQUESTS TAB */}
+        {activeTab === 'requests' && (
+          <div className="bg-white rounded-lg mt-8 p-8 shadow-sm border border-slate-200">
+            <h3 className="text-xl font-bold text-slate-900 font-headline mb-6 flex items-center gap-2">
+              <span className="material-symbols-outlined text-indigo-600">publish</span>
+              Pending Upload Requests
+            </h3>
+            {uploadRequests.length === 0 ? (
+              <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                <span className="material-symbols-outlined text-4xl text-slate-300 mb-3">inbox</span>
+                <p className="text-slate-500 font-medium">No pending upload requests.</p>
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-slate-200">
+                <table className="w-full text-left bg-white">
+                  <thead className="bg-slate-50 text-slate-600">
+                    <tr>
+                      <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider">File Name</th>
+                      <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider">Requested By</th>
+                      <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider">Target Dept</th>
+                      <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider">Date</th>
+                      <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {uploadRequests.map(req => (
+                      <tr key={req.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-6 py-5 text-sm font-bold text-slate-900 flex items-center gap-3">
+                          <span className="material-symbols-outlined text-slate-400">description</span>
+                          {req.fileName}
+                        </td>
+                        <td className="px-6 py-5 text-sm text-slate-600">
+                          <span className="font-semibold block">{req.requestedBy}</span>
+                          <span className="text-xs text-slate-400">{req.requestedByEmail}</span>
+                        </td>
+                        <td className="px-6 py-5 text-sm text-slate-600">
+                          <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded text-xs font-bold">{req.accessMode}</span>
+                        </td>
+                        <td className="px-6 py-5 text-sm font-medium text-slate-500">{new Date(req.date).toLocaleDateString()}</td>
+                        <td className="px-6 py-5 text-sm">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold capitalize ${req.status === 'Pending' ? 'bg-orange-100 text-orange-700' : req.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${req.status === 'Pending' ? 'bg-orange-500' : req.status === 'Approved' ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+                            {req.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-5 text-right">
+                          {req.status === 'Pending' && (
+                            <div className="flex justify-end gap-2">
+                              <button onClick={() => handleApproveRequest(req.id)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 transition-colors tooltip-trigger" title="Approve">
+                                <span className="material-symbols-outlined text-[20px]">check</span>
+                              </button>
+                              <button onClick={() => handleRejectRequest(req.id)} className="w-9 h-9 flex items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 transition-colors tooltip-trigger" title="Reject">
+                                <span className="material-symbols-outlined text-[20px]">close</span>
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 

@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from auth.dependencies import get_current_user
+from services.access import normalize_department
 from services.embedder import query_documents
 from services.llm import call_openrouter
 
@@ -17,11 +18,29 @@ class AskRequest(BaseModel):
 def ask_question(payload: AskRequest, current_user: dict = Depends(get_current_user)):
     try:
         user_id = current_user["user_id"]
+        role = str(current_user.get("role") or "user").lower()
+        department = normalize_department(current_user.get("department"))
         print(f"[Ask] user={user_id} question={payload.question[:60]}")
+
+        if role == "admin":
+            pinecone_filter = None
+        else:
+            pinecone_filter = {
+                "$or": [
+                    {"user_id": str(user_id)},
+                    {"owner_role": "admin", "access_mode": {"$in": ["All", department]}},
+                    {"owner_role": "admin", "access_mode": {"$exists": False}},
+                ]
+            }
 
         # ── 1. Retrieve relevant chunks from Pinecone ──────────────────────────
         try:
-            matches = query_documents(payload.question, user_id, top_k=payload.top_k)
+            matches = query_documents(
+                payload.question,
+                user_id,
+                top_k=payload.top_k,
+                metadata_filter=pinecone_filter,
+            )
         except Exception as e:
             print(f"[Ask] Pinecone error: {e}")
             matches = []

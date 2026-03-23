@@ -4,6 +4,7 @@ from bson import ObjectId
 
 from auth.utils import decode_token
 from database import get_db
+from services.access import normalize_department
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -43,5 +44,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_
     return {
         "user_id": str(user["_id"]),
         "email": user["email"],
-        "name": user["name"]
+        "name": user["name"],
+        "role": str(user.get("role") or "user").lower(),
+        "department": normalize_department(user.get("department")),
     }

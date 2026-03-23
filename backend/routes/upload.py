@@ -5,12 +5,13 @@ from pathlib import Path
 from datetime import datetime
 from bson import ObjectId
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 
 from auth.dependencies import get_current_user
 from database import get_db
 from services.botpress import delete_file_from_botpress, upload_file_to_botpress
+from services.access import build_document_visibility_query, normalize_access_mode, to_object_id
 from services.embedder import count_document_vectors, delete_document_vectors, embed_and_store
 from services.parser import parse_file
 
@@ -24,11 +25,15 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 @router.post("/upload")
 def upload_document(
     file: UploadFile = File(...),
+    access_mode: str = Form("All"),
     current_user: dict = Depends(get_current_user),
 ):
     try:
         db = get_db()
         user_id = current_user["user_id"]
+        owner_role = str(current_user.get("role") or "user").lower()
+        owner_department = current_user.get("department") or "General"
+        normalized_access_mode = normalize_access_mode(access_mode)
         
         extension = Path(file.filename or "").suffix.lower()
         if extension not in ALLOWED_EXTENSIONS:
@@ -38,7 +43,7 @@ def upload_document(
         target_name = f"{user_prefix}_{Path(file.filename).name}"
         destination = UPLOAD_DIR / target_name
 
-        user_obj_id = ObjectId(user_id) if len(str(user_id)) == 24 else user_id
+        user_obj_id = to_object_id(user_id)
         existing_docs = list(db["documents"].find({
             "user_id": user_obj_id,
             "filename": Path(file.filename).name,
@@ -81,7 +86,16 @@ def upload_document(
                 detail="No readable text found in this document",
             )
 
-        stored = embed_and_store(chunks, user_id, Path(file.filename).name)
+        stored = embed_and_store(
+            chunks,
+            user_id,
+            Path(file.filename).name,
+            metadata={
+                "access_mode": normalized_access_mode,
+                "owner_role": owner_role,
+                "owner_department": owner_department,
+            },
+        )
 
         botpress_result = {"botpress_file_id": None, "botpress_status": "not_indexed"}
         try:
@@ -96,6 +110,9 @@ def upload_document(
             "chunks_stored": stored,
             "botpress_file_id": botpress_result.get("botpress_file_id"),
             "status": "indexed",
+            "access_mode": normalized_access_mode,
+            "owner_role": owner_role,
+            "owner_department": owner_department,
             "uploaded_at": datetime.utcnow(),
             "category": None,
             "summary": None
@@ -110,6 +127,7 @@ def upload_document(
             "chunks_stored": stored,
             "botpress_file_id": doc["botpress_file_id"],
             "botpress_status": botpress_result.get("botpress_status"),
+            "access_mode": normalized_access_mode,
         }
     except HTTPException:
         raise
@@ -122,9 +140,8 @@ def upload_document(
 def get_documents(current_user: dict = Depends(get_current_user)):
     try:
         db = get_db()
-        user_id = ObjectId(current_user["user_id"]) if len(str(current_user["user_id"])) == 24 else current_user["user_id"]
-        
-        docs = db["documents"].find({"user_id": user_id}).sort("uploaded_at", -1)
+        visibility_query = build_document_visibility_query(current_user)
+        docs = db["documents"].find(visibility_query).sort("uploaded_at", -1)
         
         return [
             {
@@ -136,6 +153,9 @@ def get_documents(current_user: dict = Depends(get_current_user)):
                 "chunks_stored": d.get("chunks_stored"),
                 "botpress_file_id": d.get("botpress_file_id"),
                 "status": d.get("status"),
+                "access_mode": d.get("access_mode", "All"),
+                "owner_department": d.get("owner_department"),
+                "owner_role": d.get("owner_role"),
                 "uploaded_at": d["uploaded_at"].isoformat() if d.get("uploaded_at") else None,
             }
             for d in docs
@@ -149,17 +169,20 @@ def get_documents(current_user: dict = Depends(get_current_user)):
 def get_document_chunk_counts(current_user: dict = Depends(get_current_user)):
     try:
         db = get_db()
-        user_id_raw = current_user["user_id"]
-        user_id = ObjectId(user_id_raw) if len(str(user_id_raw)) == 24 else user_id_raw
-
-        docs = list(db["documents"].find({"user_id": user_id}, {"filename": 1, "chunks_stored": 1}))
+        docs = list(
+            db["documents"].find(
+                build_document_visibility_query(current_user),
+                {"filename": 1, "chunks_stored": 1, "user_id": 1},
+            )
+        )
         result = []
         for doc in docs:
             filename = doc.get("filename")
             pinecone_chunks = 0
             error = None
             try:
-                pinecone_chunks = count_document_vectors(user_id_raw, filename)
+                owner_user_id = str(doc.get("user_id"))
+                pinecone_chunks = count_document_vectors(owner_user_id, filename)
             except Exception as exc:
                 error = str(exc)
 
@@ -187,14 +210,15 @@ def preview_document(
     """Stream the original file so the browser can preview it (token accepted via query param for iframe use)."""
     try:
         db = get_db()
-        user_id = ObjectId(current_user["user_id"]) if len(str(current_user["user_id"])) == 24 else current_user["user_id"]
-
         try:
             doc_obj_id = ObjectId(doc_id)
         except Exception:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid document ID")
 
-        doc = db["documents"].find_one({"_id": doc_obj_id, "user_id": user_id})
+        doc = db["documents"].find_one({
+            "_id": doc_obj_id,
+            **build_document_visibility_query(current_user),
+        })
         if not doc:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
@@ -226,14 +250,16 @@ def delete_document(
 ):
     try:
         db = get_db()
-        user_id = ObjectId(current_user["user_id"]) if len(str(current_user["user_id"])) == 24 else current_user["user_id"]
+        user_id = to_object_id(current_user["user_id"])
         
         try:
             doc_obj_id = ObjectId(doc_id)
         except:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid document ID")
         
-        doc = db["documents"].find_one({"_id": doc_obj_id, "user_id": user_id})
+        role = str(current_user.get("role") or "user").lower()
+        delete_query = {"_id": doc_obj_id} if role == "admin" else {"_id": doc_obj_id, "user_id": user_id}
+        doc = db["documents"].find_one(delete_query)
         if not doc:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 

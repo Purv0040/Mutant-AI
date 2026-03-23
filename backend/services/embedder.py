@@ -29,11 +29,12 @@ else:
 print("Loading embedding model...")
 model = SentenceTransformer('BAAI/bge-large-en-v1.5')
 
-def embed_and_store(chunks, user_id, filename):
+def embed_and_store(chunks, user_id, filename, metadata=None):
     """
     Embeds text chunks and stores them in Pinecone.
     """
     vectors = []
+    metadata = metadata or {}
     for i, chunk in enumerate(chunks):
         text = chunk.get("text", "")
         if not text:
@@ -45,15 +46,18 @@ def embed_and_store(chunks, user_id, filename):
         # Create unique ID for the vector
         vector_id = f"u{user_id}_{filename}_{i}"
         
+        vector_metadata = {
+            "user_id": str(user_id),
+            "filename": filename,
+            "text": text,
+            "chunk_index": i,
+            **metadata,
+        }
+
         vectors.append({
             "id": vector_id,
             "values": embedding,
-            "metadata": {
-                "user_id": str(user_id),
-                "filename": filename,
-                "text": text,
-                "chunk_index": i
-            }
+            "metadata": vector_metadata,
         })
     
     # Upsert to Pinecone
@@ -62,7 +66,7 @@ def embed_and_store(chunks, user_id, filename):
     
     return len(vectors)
 
-def query_documents(question, user_id, top_k=5):
+def query_documents(question, user_id, top_k=5, metadata_filter=None):
     """
     Queries Pinecone for relevant document chunks.
     """
@@ -70,10 +74,11 @@ def query_documents(question, user_id, top_k=5):
     query_embedding = model.encode(question).tolist()
     
     # Query Pinecone with filter for user_id
+    effective_filter = metadata_filter or {"user_id": str(user_id)}
     results = index.query(
         vector=query_embedding,
         top_k=top_k,
-        filter={"user_id": str(user_id)},
+        filter=effective_filter,
         include_metadata=True
     )
     

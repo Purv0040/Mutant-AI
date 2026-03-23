@@ -15,6 +15,8 @@ class RegisterRequest(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     email: EmailStr
     password: str
+    role: str = "user"
+    department: str | None = None
 
 
 class LoginRequest(BaseModel):
@@ -30,6 +32,31 @@ class UpdateProfileRequest(BaseModel):
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str = Field(min_length=6)
+
+
+def _normalize_role(value: str | None) -> str:
+    role = (value or "user").strip().lower()
+    if role in {"admin", "user", "viewer", "editor"}:
+        return role
+    if role in {"engineer", "designer", "product manager", "marketing"}:
+        return "user"
+    return "user"
+
+
+def _normalize_department(department: str | None, role_input: str | None) -> str:
+    raw = (department or "").strip()
+    if raw:
+        normalized = raw.title()
+        return "Engineering" if normalized == "Engineer" else normalized
+
+    role_map = {
+        "engineer": "Engineering",
+        "designer": "Design",
+        "product manager": "Product",
+        "marketing": "Marketing",
+    }
+    fallback = role_map.get((role_input or "").strip().lower())
+    return fallback or "General"
 
 
 @router.post("/register")
@@ -48,11 +75,16 @@ def register(payload: RegisterRequest):
         if existing:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
 
+        role = _normalize_role(payload.role)
+        department = _normalize_department(payload.department, payload.role)
+
         # Create new user document
         user_doc = {
             "name": payload.name,
             "email": normalized_email,
             "hashed_password": hash_password(payload.password),
+            "role": role,
+            "department": department,
             "created_at": datetime.utcnow()
         }
         
@@ -60,7 +92,15 @@ def register(payload: RegisterRequest):
         user_id = str(result.inserted_id)
         
         # Create access token
-        token = create_access_token({"sub": normalized_email, "user_id": user_id, "username": payload.name})
+        token = create_access_token(
+            {
+                "sub": normalized_email,
+                "user_id": user_id,
+                "username": payload.name,
+                "role": role,
+                "department": department,
+            }
+        )
         
         return {
             "access_token": token,
@@ -68,7 +108,9 @@ def register(payload: RegisterRequest):
             "user": {
                 "id": user_id,
                 "name": payload.name,
-                "email": normalized_email
+                "email": normalized_email,
+                "role": role,
+                "department": department,
             }
         }
     except HTTPException:
@@ -97,7 +139,17 @@ def login(payload: LoginRequest):
         user_id = str(user["_id"])
         
         # Create access token
-        token = create_access_token({"sub": user["email"], "user_id": user_id, "username": user["name"]})
+        role = _normalize_role(user.get("role"))
+        department = _normalize_department(user.get("department"), user.get("role"))
+        token = create_access_token(
+            {
+                "sub": user["email"],
+                "user_id": user_id,
+                "username": user["name"],
+                "role": role,
+                "department": department,
+            }
+        )
         
         return {
             "access_token": token,
@@ -105,7 +157,9 @@ def login(payload: LoginRequest):
             "user": {
                 "id": user_id,
                 "name": user["name"],
-                "email": user["email"]
+                "email": user["email"],
+                "role": role,
+                "department": department,
             }
         }
     except HTTPException:
@@ -160,6 +214,8 @@ def get_profile(current_user: dict = Depends(get_current_user)):
             "id": str(user["_id"]),
             "name": user["name"],
             "email": user["email"],
+            "role": _normalize_role(user.get("role")),
+            "department": _normalize_department(user.get("department"), user.get("role")),
             "created_at": user.get("created_at").isoformat() if user.get("created_at") else None,
         }
     except HTTPException:
@@ -189,12 +245,17 @@ def update_profile(payload: UpdateProfileRequest, current_user: dict = Depends(g
             if existing:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already in use")
         
+        current_role = _normalize_role(current_user.get("role"))
+        current_department = _normalize_department(current_user.get("department"), current_user.get("role"))
+
         # Update user document
         db["users"].update_one(
             {"_id": user_id},
             {"$set": {
                 "name": payload.name,
                 "email": normalized_email,
+                "role": current_role,
+                "department": current_department,
                 "updated_at": datetime.utcnow()
             }}
         )
@@ -206,7 +267,9 @@ def update_profile(payload: UpdateProfileRequest, current_user: dict = Depends(g
         token = create_access_token({
             "sub": normalized_email,
             "user_id": str(user_id),
-            "username": payload.name
+            "username": payload.name,
+            "role": current_role,
+            "department": current_department,
         })
         
         return {
@@ -215,7 +278,9 @@ def update_profile(payload: UpdateProfileRequest, current_user: dict = Depends(g
             "user": {
                 "id": str(user["_id"]),
                 "name": user["name"],
-                "email": user["email"]
+                "email": user["email"],
+                "role": current_role,
+                "department": current_department,
             },
             "message": "Profile updated successfully"
         }

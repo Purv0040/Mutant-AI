@@ -1,7 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const DashboardSidebar = () => {
   const location = useLocation();
+  const { isAdmin } = useAuth();
   const isActive = (path) => location.pathname === path;
 
   return (
@@ -77,21 +79,24 @@ const DashboardSidebar = () => {
           </span>
           <span>Meetings</span>
         </Link>
-        {/* Search */}
-        <Link
-          to="/categorization"
-          className={`flex items-center gap-3 px-4 py-3 font-manrope text-sm font-medium tracking-tight transition-all duration-300 scale-95 active:scale-90 ${
-            isActive('/categorization')
-              ? 'text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-900/30 border-l-4 border-indigo-600 rounded-xl'
-              : 'text-slate-500 dark:text-slate-400 hover:text-indigo-500 hover:bg-indigo-50/30 dark:hover:bg-indigo-900/20 rounded-xl transition-transform'
-          }`}
-        >
-          <span className="material-symbols-outlined" style={isActive('/categorization') ? { fontVariationSettings: "'FILL' 1" } : {}}>
-            category
-          </span>
-          <span>Categorization</span>
-        </Link>
-        {/* Analytics */}
+        {/* Search / Categorization - Admin Only */}
+        {isAdmin && (
+          <Link
+            to="/categorization"
+            className={`flex items-center gap-3 px-4 py-3 font-manrope text-sm font-medium tracking-tight transition-all duration-300 scale-95 active:scale-90 ${
+              isActive('/categorization')
+                ? 'text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-900/30 border-l-4 border-indigo-600 rounded-xl'
+                : 'text-slate-500 dark:text-slate-400 hover:text-indigo-500 hover:bg-indigo-50/30 dark:hover:bg-indigo-900/20 rounded-xl transition-transform'
+            }`}
+          >
+            <span className="material-symbols-outlined" style={isActive('/categorization') ? { fontVariationSettings: "'FILL' 1" } : {}}>
+              category
+            </span>
+            <span>Categorization</span>
+          </Link>
+        )}
+        {/* Analytics - Admin Only */}
+        {isAdmin && (
         <Link
           to="/analytics"
           className={`flex items-center gap-3 px-4 py-3 font-manrope text-sm font-medium tracking-tight transition-all duration-300 scale-95 active:scale-90 ${
@@ -105,20 +110,23 @@ const DashboardSidebar = () => {
           </span>
           <span>Analytics</span>
         </Link>
-        {/* Team */}
-        <Link
-          to="/team"
-          className={`flex items-center gap-3 px-4 py-3 font-manrope text-sm font-medium tracking-tight transition-all duration-300 scale-95 active:scale-90 ${
-            isActive('/team')
-              ? 'text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-900/30 border-l-4 border-indigo-600 rounded-xl'
-              : 'text-slate-500 dark:text-slate-400 hover:text-indigo-500 hover:bg-indigo-50/30 dark:hover:bg-indigo-900/20 rounded-xl transition-transform'
-          }`}
-        >
-          <span className="material-symbols-outlined" style={isActive('/team') ? { fontVariationSettings: "'FILL' 1" } : {}}>
-            group_add
-          </span>
-          <span>Team</span>
-        </Link>
+        )}
+        {/* Team - Admin Only */}
+        {isAdmin && (
+          <Link
+            to="/team"
+            className={`flex items-center gap-3 px-4 py-3 font-manrope text-sm font-medium tracking-tight transition-all duration-300 scale-95 active:scale-90 ${
+              isActive('/team')
+                ? 'text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-900/30 border-l-4 border-indigo-600 rounded-xl'
+                : 'text-slate-500 dark:text-slate-400 hover:text-indigo-500 hover:bg-indigo-50/30 dark:hover:bg-indigo-900/20 rounded-xl transition-transform'
+            }`}
+          >
+            <span className="material-symbols-outlined" style={isActive('/team') ? { fontVariationSettings: "'FILL' 1" } : {}}>
+              group_add
+            </span>
+            <span>Team</span>
+          </Link>
+        )}
         {/* Settings */}
         <Link
           to="/settings"

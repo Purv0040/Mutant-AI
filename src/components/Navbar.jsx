@@ -45,13 +45,13 @@ const Navbar = () => {
       </div>
       <div className="flex items-center gap-6">
         <Link
-          to="/signin"
+          to="/role-selection"
           className="font-manrope text-sm font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-300 opacity-80 hover:opacity-100 transition-all"
         >
           Sign In
         </Link>
         <Link
-          to="/signup"
+          to="/role-selection"
           className="bg-primary hover:bg-primary-container text-white px-6 py-2.5 rounded-full font-manrope text-sm font-semibold uppercase tracking-widest transition-all"
         >
           Sign Up

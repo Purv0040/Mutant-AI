@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import TopBar from '../components/TopBar'
 import FileTable from '../components/FileTable'
+import UploadRequestModal from '../components/UploadRequestModal'
 import { categorizeDoc, getDocuments, uploadDocument } from '../api'
 
 const categoryStyle = {
@@ -24,7 +25,7 @@ export default function Categorization() {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState('')
-  const fileInputRef = useRef(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   const fetchRows = async () => {
     setLoading(true)
@@ -35,7 +36,8 @@ export default function Categorization() {
         name: doc.filename,
         type: normalizeType(doc.filename),
         category: doc.category || 'Management',
-        tags: ['Status: ' + (doc.status || 'uploaded')],
+        accessMode: doc.accessMode || doc.access_mode || 'All Departments',
+        tags: ['Status: ' + (doc.status || 'uploaded'), ...(doc.extracted_fields || [])],
         confidence: doc.category ? 90 : 0,
       }))
       setRows(mapped)
@@ -50,9 +52,9 @@ export default function Categorization() {
     fetchRows()
   }, [])
 
-  const handleUpload = async (event) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+  const handleModalSubmit = async (data) => {
+    const { file, accessMode } = data
+    setIsModalOpen(false)
 
     setUploading(true)
     setUploadProgress(0)
@@ -60,7 +62,9 @@ export default function Categorization() {
     try {
       const uploaded = await uploadDocument(file, {
         onProgress: (percent) => setUploadProgress(percent),
+        accessMode: accessMode
       })
+      
       const categorized = await categorizeDoc(uploaded.filename)
       await fetchRows()
 
@@ -71,7 +75,7 @@ export default function Categorization() {
           next[idx] = {
             ...next[idx],
             category: categorized.category || next[idx].category,
-            tags: categorized.extracted_fields?.length ? categorized.extracted_fields : next[idx].tags,
+            tags: categorized.extracted_fields ? ['Status: indexed', ...categorized.extracted_fields] : next[idx].tags,
             confidence: Math.round((categorized.confidence || 0.8) * 100),
           }
         }
@@ -82,7 +86,6 @@ export default function Categorization() {
     } finally {
       setUploading(false)
       setUploadProgress(0)
-      event.target.value = ''
     }
   }
 
@@ -93,7 +96,7 @@ export default function Categorization() {
         actions={
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => setIsModalOpen(true)}
             className="flex items-center gap-2 px-3.5 py-2 bg-primary text-white text-[13px] font-medium rounded-btn hover:bg-accent transition-colors"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -107,12 +110,10 @@ export default function Categorization() {
       />
 
       <div className="flex-1 overflow-y-auto scrollbar-thin p-6 space-y-5">
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          accept=".pdf,.pptx,.xlsx"
-          onChange={handleUpload}
+        <UploadRequestModal 
+          isOpen={isModalOpen} 
+          onClose={() => setIsModalOpen(false)} 
+          onSubmit={handleModalSubmit} 
         />
 
         {/* Page header */}
@@ -128,7 +129,7 @@ export default function Categorization() {
         {/* Drop zone */}
         <button
           type="button"
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => setIsModalOpen(true)}
           className="w-full border-2 border-dashed border-outline-variant rounded-card p-10 text-center hover:border-accent hover:bg-accent/5 transition-all cursor-pointer group"
         >
           <div className="flex justify-center mb-3 text-on-surface-variant group-hover:text-accent transition-colors">

@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getDocuments } from '../api'
+import { useAuth } from '../context/AuthContext'
+import UploadRequestModal from '../components/UploadRequestModal'
 
 const DashboardPage = () => {
   const navigate = useNavigate()
+  const { user, isAdmin } = useAuth()
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -149,12 +153,12 @@ const DashboardPage = () => {
           <div className="grid grid-cols-1 gap-4">
             <button
               className="flex items-center justify-between p-6 bg-surface-container-highest text-on-surface rounded-lg transition-all hover:bg-surface-container-high active:scale-95 group"
-              onClick={() => navigate('/documents')}
+              onClick={() => isAdmin ? navigate('/documents') : setIsUploadModalOpen(true)}
             >
               <div className="flex items-center gap-4">
-                <span className="material-symbols-outlined text-3xl text-primary">cloud_upload</span>
+                <span className="material-symbols-outlined text-3xl text-primary">{isAdmin ? 'cloud_upload' : 'publish'}</span>
                 <div className="text-left">
-                  <div className="font-bold">Upload Doc</div>
+                  <div className="font-bold">{isAdmin ? 'Upload Doc' : 'Request Upload'}</div>
                   <div className="text-xs text-on-surface-variant">PDF, DOCX, CSV</div>
                 </div>
               </div>
@@ -179,6 +183,28 @@ const DashboardPage = () => {
           </div>
         </div>
       </div>
+
+      <UploadRequestModal 
+        isOpen={isUploadModalOpen} 
+        onClose={() => setIsUploadModalOpen(false)}
+        onSubmit={(data) => {
+          const newRequest = {
+            id: Date.now().toString(),
+            fileName: data.file.name,
+            fileSize: data.file.size,
+            accessMode: data.accessMode,
+            requestedBy: user?.name || 'Unknown User',
+            requestedByEmail: user?.email || '',
+            status: 'Pending',
+            date: new Date().toISOString()
+          };
+          const existing = JSON.parse(localStorage.getItem('mutant_upload_requests') || '[]');
+          localStorage.setItem('mutant_upload_requests', JSON.stringify([newRequest, ...existing]));
+          setIsUploadModalOpen(false);
+          // In a real app we'd use a proper toast notification system
+          alert('Upload request sent to Admin successfully.');
+        }}
+      />
     </main>
   );
 };

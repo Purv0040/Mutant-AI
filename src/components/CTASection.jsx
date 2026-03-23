@@ -9,7 +9,7 @@ const CTASection = () => {
         </h2>
         <div className="flex flex-col sm:flex-row gap-6 justify-center">
           <Link
-            to="/signup"
+            to="/role-selection"
             className="bg-primary hover:bg-primary-container text-white px-10 py-5 rounded-xl font-headline font-bold text-xl transition-all shadow-xl shadow-primary/20"
           >
             Get Started for Free

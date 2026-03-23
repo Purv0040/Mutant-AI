@@ -1,11 +1,11 @@
 import json
-from bson import ObjectId
 
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from auth.dependencies import get_current_user
 from database import get_db
+from services.access import build_document_visibility_query
 from services.llm import get_smart_llm
 from services.parser import parse_file
 
@@ -23,11 +23,10 @@ def summarize_document(
 ):
     try:
         db = get_db()
-        user_id = ObjectId(current_user["user_id"]) if len(str(current_user["user_id"])) == 24 else current_user["user_id"]
-        
+        visibility_query = build_document_visibility_query(current_user)
         doc = db["documents"].find_one({
-            "user_id": user_id,
-            "filename": payload.filename
+            **visibility_query,
+            "filename": payload.filename,
         })
         if not doc:
             raise HTTPException(status_code=404, detail="Document not found")

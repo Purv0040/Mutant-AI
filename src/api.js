@@ -45,6 +45,7 @@ export function register(payload) {
 export function uploadDocument(file, options = {}) {
   const formData = new FormData()
   formData.append('file', file)
+  formData.append('access_mode', options.accessMode || 'All')
 
   if (typeof options.onProgress === 'function') {
     const token = localStorage.getItem('mutant_token')

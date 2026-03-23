@@ -51,8 +51,11 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
+  // Helper to check if current user is an admin
+  const isAdmin = user?.role === 'admin'
+
   return (
-    <AuthContext.Provider value={{ token, user, login, logout }}>
+    <AuthContext.Provider value={{ token, user, login, logout, isAdmin }}>
       {children}
     </AuthContext.Provider>
   )

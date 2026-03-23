@@ -3,6 +3,7 @@ const tableData = [
     name: 'Invoice_Oct2024.pdf',
     type: 'PDF',
     category: 'Finance',
+    accessMode: 'All Departments',
     tags: ['Vendor: Infosys', '₹2,40,000', 'Due: 15 Nov'],
     confidence: 94,
   },
@@ -10,6 +11,7 @@ const tableData = [
     name: 'Employee_Contract_Priya.pdf',
     type: 'PDF',
     category: 'HR',
+    accessMode: 'HR',
     tags: ['Name: Priya Sharma', 'Role: SDE-2'],
     confidence: 97,
   },
@@ -17,6 +19,7 @@ const tableData = [
     name: 'Product_Roadmap_H2.pptx',
     type: 'PPT',
     category: 'Management',
+    accessMode: 'Product',
     tags: ['22 slides', '3 milestones', 'Q4 launch'],
     confidence: 89,
   },
@@ -24,6 +27,7 @@ const tableData = [
     name: 'NDA_ClientX_Signed.pdf',
     type: 'PDF',
     category: 'Legal',
+    accessMode: 'Legal',
     tags: ['Party: ClientX', 'Valid: 2 yrs'],
     confidence: 91,
   },
@@ -31,6 +35,7 @@ const tableData = [
     name: 'Server_Costs_Q3.xlsx',
     type: 'XLSX',
     category: 'IT / Infra',
+    accessMode: 'Engineering',
     tags: ['₹18.4L total', 'AWS/GCP'],
     confidence: 86,
   },
@@ -71,6 +76,7 @@ export default function FileTable({ data = tableData }) {
             <th className="text-left py-2.5 px-4 font-medium text-on-surface-variant text-[11px] uppercase tracking-wider">File Name</th>
             <th className="text-left py-2.5 px-4 font-medium text-on-surface-variant text-[11px] uppercase tracking-wider">Type</th>
             <th className="text-left py-2.5 px-4 font-medium text-on-surface-variant text-[11px] uppercase tracking-wider">Category</th>
+            <th className="text-left py-2.5 px-4 font-medium text-on-surface-variant text-[11px] uppercase tracking-wider">Access Mode</th>
             <th className="text-left py-2.5 px-4 font-medium text-on-surface-variant text-[11px] uppercase tracking-wider">Extracted Info</th>
             <th className="text-left py-2.5 px-4 font-medium text-on-surface-variant text-[11px] uppercase tracking-wider w-36">Confidence</th>
           </tr>
@@ -95,8 +101,13 @@ export default function FileTable({ data = tableData }) {
                 </span>
               </td>
               <td className="py-3 px-4">
-                <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${categoryStyle[row.category]}`}>
+                <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${categoryStyle[row.category] || categoryStyle['Management']}`}>
                   {row.category}
+                </span>
+              </td>
+              <td className="py-3 px-4">
+                <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded text-[11px] font-bold">
+                  {row.accessMode || 'All Departments'}
                 </span>
               </td>
               <td className="py-3 px-4">
