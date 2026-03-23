@@ -14,13 +14,27 @@ build/
 .env.*.local
 backend/.env
 
+# Python virtual environments
+.venv/
+backend/.venv/
+backend/venv/
+venv/
+ENV/
+env/
+
 # Python backend artifacts
 backend/uploads/
 uploads/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 *.db
 indexes/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
 
 # Logs
 logs/
