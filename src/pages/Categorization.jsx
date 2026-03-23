@@ -12,10 +12,15 @@ const categoryStyle = {
 }
 
 function normalizeType(filename) {
-  const ext = filename.split('.').pop()?.toUpperCase()
-  if (ext === 'PPTX') return 'PPT'
-  if (ext === 'XLSX') return 'XLSX'
-  return 'PDF'
+  const ext = filename.split('.').pop()?.toLowerCase()
+
+  if (ext === 'pdf') return 'PDF'
+  if (ext === 'doc' || ext === 'docx') return 'DOCX'
+  if (ext === 'ppt' || ext === 'pptx') return 'PPT'
+  if (ext === 'xls' || ext === 'xlsx') return 'XLSX'
+  if (ext === 'csv') return 'CSV'
+
+  return (ext || 'FILE').toUpperCase()
 }
 
 function normalizeAccessMode(accessMode) {
