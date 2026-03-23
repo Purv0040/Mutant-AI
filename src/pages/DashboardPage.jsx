@@ -1,11 +1,54 @@
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { getDocuments } from '../api'
 
 const DashboardPage = () => {
   const navigate = useNavigate()
+  const [documents, setDocuments] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const loadDashboard = async () => {
+      setLoading(true)
+      setError('')
+      try {
+        const docs = await getDocuments()
+        setDocuments(Array.isArray(docs) ? docs : [])
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadDashboard()
+  }, [])
+
+  const metrics = useMemo(() => {
+    const total = documents.length
+    const indexed = documents.filter((doc) => String(doc.status).toLowerCase() === 'indexed').length
+    const latest = [...documents]
+      .sort((a, b) => new Date(b.uploaded_at || 0).getTime() - new Date(a.uploaded_at || 0).getTime())
+      .slice(0, 3)
+
+    return { total, indexed, latest }
+  }, [documents])
+
+  const uploadedAgo = (iso) => {
+    if (!iso) return 'Unknown time'
+    const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+    if (seconds < 60) return `${seconds}s ago`
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) return `${minutes}m ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours}h ago`
+    const days = Math.floor(hours / 24)
+    return `${days}d ago`
+  }
 
   return (
     <main className="w-full h-full p-8 lg:p-12 overflow-y-auto min-h-screen">
-      {/* Top App Bar Content */}
       <header className="flex justify-between items-end mb-12">
         <div>
           <p className="text-label-sm font-label uppercase tracking-[0.2em] text-on-surface-variant mb-2">
@@ -20,196 +63,134 @@ const DashboardPage = () => {
             <img
               alt="User Avatar"
               className="w-full h-full object-cover"
-              data-alt="Close up portrait of a professional man"
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuBmr_UpAGGzuUQ0Nnm8V34JSslbr5FUIcVn-GXlLdlBCnDH4yhIaGdJ9KCxO7sXYpNl9ffbFawt_ABpwyOw1e0jMEH5LFOzjBdwtuWjTsv-gJuTDcqXClBVb2vpkyOGHJgMzp5ITb6R--tJZ7v4KnSRC8ZwpORNr175CCaK_J-zL3azW1H1MdeG7iWGRBJWtvoanMGgHXJRMmEh2BUZtyqGOXHf0eYIGWctu_cTHtSmf962Ny-cvH8RKn9J64Tj88hUXtzh6lFxDXg"
             />
           </div>
         </div>
       </header>
-      {/* KPI Bento Grid */}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        {/* Card 1 */}
-        <div className="bg-surface-container-lowest p-8 rounded-lg shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-500 group">
+        <div className="bg-surface-container-lowest p-8 rounded-lg shadow-sm hover:shadow-xl transition-all duration-500 group">
           <div className="flex justify-between items-start mb-6">
             <div className="p-3 bg-secondary-fixed rounded-2xl group-hover:bg-primary-container group-hover:text-white transition-colors">
-              <span className="material-symbols-outlined" data-icon="folder_managed">
-                folder_managed
-              </span>
+              <span className="material-symbols-outlined">folder_managed</span>
             </div>
-            <span className="text-xs font-bold text-secondary">+12% vs LY</span>
+            <span className="text-xs font-bold text-secondary">Live</span>
           </div>
-          <div className="text-4xl font-headline font-bold text-on-surface mb-1">1,240</div>
+          <div className="text-4xl font-headline font-bold text-on-surface mb-1">
+            {loading ? '...' : metrics.total}
+          </div>
           <div className="text-sm font-body text-on-surface-variant">Total Documents</div>
         </div>
-        {/* Card 2 */}
-        <div className="bg-surface-container-lowest p-8 rounded-lg shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-500 group">
+
+        <div className="bg-surface-container-lowest p-8 rounded-lg shadow-sm hover:shadow-xl transition-all duration-500 group">
           <div className="flex justify-between items-start mb-6">
             <div className="p-3 bg-secondary-fixed rounded-2xl group-hover:bg-primary-container group-hover:text-white transition-colors">
-              <span className="material-symbols-outlined" data-icon="query_stats">
-                query_stats
-              </span>
+              <span className="material-symbols-outlined">query_stats</span>
             </div>
-            <span className="text-xs font-bold text-primary">Live</span>
+            <span className="text-xs font-bold text-primary">Synced</span>
           </div>
-          <div className="text-4xl font-headline font-bold text-on-surface mb-1">85</div>
-          <div className="text-sm font-body text-on-surface-variant">Queries Today</div>
+          <div className="text-4xl font-headline font-bold text-on-surface mb-1">
+            {loading ? '...' : metrics.indexed}
+          </div>
+          <div className="text-sm font-body text-on-surface-variant">Indexed In Pinecone</div>
         </div>
-        {/* Card 3 */}
-        <div className="bg-surface-container-lowest p-8 rounded-lg shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-500 group">
+
+        <div className="bg-surface-container-lowest p-8 rounded-lg shadow-sm hover:shadow-xl transition-all duration-500 group">
           <div className="flex justify-between items-start mb-6">
             <div className="p-3 bg-secondary-fixed rounded-2xl group-hover:bg-primary-container group-hover:text-white transition-colors">
-              <span className="material-symbols-outlined" data-icon="videocam">
-                videocam
-              </span>
+              <span className="material-symbols-outlined">auto_awesome</span>
             </div>
-            <span className="text-xs font-bold text-on-surface-variant">4 Active</span>
+            <span className="text-xs font-bold text-on-surface-variant">Active Agent</span>
           </div>
-          <div className="text-4xl font-headline font-bold text-on-surface mb-1">12</div>
-          <div className="text-sm font-body text-on-surface-variant">Meetings Processed</div>
+          <div className="text-4xl font-headline font-bold text-on-surface mb-1">AI</div>
+          <div className="text-sm font-body text-on-surface-variant">Intelligence Ready</div>
         </div>
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Recent Activity: Editorial Highlight */}
         <div className="lg:col-span-8 space-y-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold font-headline tracking-tight text-on-surface">Archival Log</h2>
-            <button className="text-primary text-sm font-bold hover:underline">View Analytics</button>
+            <button className="text-primary text-sm font-bold hover:underline" onClick={() => navigate('/documents')}>
+              View All
+            </button>
           </div>
           <div className="bg-surface-container-low rounded-lg p-1 space-y-1">
-            {/* Activity Item 1 */}
-            <div className="bg-surface-container-lowest p-6 rounded-lg flex items-center gap-6 transition-all hover:scale-[1.01]">
-              <div className="w-12 h-12 bg-secondary-fixed rounded-full flex items-center justify-center text-secondary">
-                <span className="material-symbols-outlined" data-icon="search">
-                  search
-                </span>
+            {loading && <p className="p-8 text-center text-on-surface-variant text-sm">Synchronizing archival data...</p>}
+            {!loading && metrics.latest.length === 0 && (
+              <p className="p-8 text-center text-on-surface-variant text-sm">No documents found. Start by uploading a file.</p>
+            )}
+            {!loading && metrics.latest.map((doc) => (
+              <div key={doc.id} className="bg-surface-container-lowest p-6 rounded-lg flex items-center gap-6 transition-all hover:scale-[1.01]">
+                <div className="w-12 h-12 bg-secondary-fixed rounded-full flex items-center justify-center text-secondary">
+                  <span className="material-symbols-outlined">
+                    {doc.filename.endsWith('.pdf') ? 'picture_as_pdf' : doc.filename.endsWith('.csv') ? 'table_chart' : 'description'}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-on-surface-variant mb-1">Upload • {uploadedAgo(doc.uploaded_at)}</div>
+                  <div className="font-headline text-lg font-semibold truncate">{doc.filename}</div>
+                </div>
+                <div className="text-right">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                    doc.status === 'indexed' ? 'bg-green-100 text-green-700' : 'bg-surface-container-high text-on-surface-variant'
+                  }`}>
+                    {doc.status || 'Processed'}
+                  </span>
+                </div>
               </div>
-              <div className="flex-1">
-                <div className="text-sm text-on-surface-variant mb-1">AI Query • 14 mins ago</div>
-                <div className="font-headline text-lg font-semibold">"Analyze Q4 revenue projections for EMEA"</div>
-              </div>
-              <div className="text-right">
-                <span className="inline-flex items-center px-3 py-1 rounded-full bg-surface-container-high text-[10px] font-bold uppercase tracking-wider">
-                  Processed
-                </span>
-              </div>
-            </div>
-            {/* Activity Item 2 */}
-            <div className="bg-surface-container-lowest p-6 rounded-lg flex items-center gap-6 transition-all hover:scale-[1.01]">
-              <div className="w-12 h-12 bg-secondary-fixed rounded-full flex items-center justify-center text-secondary">
-                <span className="material-symbols-outlined" data-icon="upload_file">
-                  upload_file
-                </span>
-              </div>
-              <div className="flex-1">
-                <div className="text-sm text-on-surface-variant mb-1">Upload • 2 hours ago</div>
-                <div className="font-headline text-lg font-semibold">Annual_Report_2023_Final.pdf</div>
-              </div>
-              <div className="text-right">
-                <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary-fixed text-primary text-[10px] font-bold uppercase tracking-wider">
-                  Indexing
-                </span>
-              </div>
-            </div>
-            {/* Activity Item 3 */}
-            <div className="bg-surface-container-lowest p-6 rounded-lg flex items-center gap-6 transition-all hover:scale-[1.01]">
-              <div className="w-12 h-12 bg-secondary-fixed rounded-full flex items-center justify-center text-secondary">
-                <span className="material-symbols-outlined" data-icon="forum">
-                  forum
-                </span>
-              </div>
-              <div className="flex-1">
-                <div className="text-sm text-on-surface-variant mb-1">Meeting Transcript • 5 hours ago</div>
-                <div className="font-headline text-lg font-semibold">Product Strategy Sync - Sync with AI Agent</div>
-              </div>
-              <div className="text-right">
-                <span className="inline-flex items-center px-3 py-1 rounded-full bg-surface-container-high text-[10px] font-bold uppercase tracking-wider">
-                  Summarized
-                </span>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
-        {/* Quick Actions Sidebar */}
+
         <div className="lg:col-span-4 space-y-6">
           <h2 className="text-2xl font-bold font-headline tracking-tight text-on-surface">Accelerators</h2>
           <div className="grid grid-cols-1 gap-4">
-            <button className="flex items-center justify-between p-6 bg-primary text-white rounded-lg transition-all hover:opacity-90 active:scale-95 group shadow-lg shadow-indigo-200">
+            <button 
+              className="flex items-center justify-between p-6 bg-primary text-white rounded-lg transition-all hover:opacity-90 active:scale-95 group shadow-lg shadow-indigo-200"
+              onClick={() => navigate('/ask')}
+            >
               <div className="flex items-center gap-4">
-                <span
-                  className="material-symbols-outlined text-3xl"
-                  data-icon="add_circle"
-                  style={{ fontVariationSettings: "'FILL' 1" }}
-                >
-                  add_circle
-                </span>
+                <span className="material-symbols-outlined text-3xl">add_circle</span>
                 <div className="text-left">
                   <div className="font-bold">New Chat</div>
                   <div className="text-xs opacity-70">Initialize Intelligence</div>
                 </div>
               </div>
-              <span className="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity" data-icon="arrow_forward">
-                arrow_forward
-              </span>
+              <span className="material-symbols-outlined opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
             </button>
             <button
               className="flex items-center justify-between p-6 bg-surface-container-highest text-on-surface rounded-lg transition-all hover:bg-surface-container-high active:scale-95 group"
               onClick={() => navigate('/documents')}
             >
               <div className="flex items-center gap-4">
-                <span className="material-symbols-outlined text-3xl text-primary" data-icon="cloud_upload">
-                  cloud_upload
-                </span>
+                <span className="material-symbols-outlined text-3xl text-primary">cloud_upload</span>
                 <div className="text-left">
                   <div className="font-bold">Upload Doc</div>
                   <div className="text-xs text-on-surface-variant">PDF, DOCX, CSV</div>
                 </div>
               </div>
-              <span className="material-symbols-outlined text-primary opacity-0 group-hover:opacity-100 transition-opacity" data-icon="arrow_forward">
-                arrow_forward
-              </span>
-            </button>
-            <button className="flex items-center justify-between p-6 bg-surface-container-highest text-on-surface rounded-lg transition-all hover:bg-surface-container-high active:scale-95 group">
-              <div className="flex items-center gap-4">
-                <span className="material-symbols-outlined text-3xl text-primary" data-icon="meet">
-                  video_chat
-                </span>
-                <div className="text-left">
-                  <div className="font-bold">Start Meeting</div>
-                  <div className="text-xs text-on-surface-variant">Real-time Transcription</div>
-                </div>
-              </div>
-              <span className="material-symbols-outlined text-primary opacity-0 group-hover:opacity-100 transition-opacity" data-icon="arrow_forward">
-                arrow_forward
-              </span>
+              <span className="material-symbols-outlined text-primary opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
             </button>
           </div>
-          {/* Insights Fragment */}
+
           <div className="mt-8 p-8 bg-gradient-to-br from-indigo-600 to-tertiary-container rounded-lg text-white relative overflow-hidden">
             <div className="relative z-10">
               <div className="text-[10px] font-bold uppercase tracking-widest opacity-80 mb-4">AI Proactive Insight</div>
               <div className="text-2xl font-headline font-bold leading-tight mb-4">
-                "Your document frequency has increased by 40% this week. Would you like a weekly summary?"
+                "Intelligence is verified across {metrics.indexed} localized document chunks."
               </div>
-              <button className="px-6 py-2 bg-white/20 backdrop-blur-md rounded-full text-sm font-bold hover:bg-white/30 transition-colors">
-                Generate Report
+              <button 
+                className="px-6 py-2 bg-white/20 backdrop-blur-md rounded-full text-sm font-bold hover:bg-white/30 transition-colors"
+                onClick={() => navigate('/documents')}
+              >
+                Manage Data
               </button>
             </div>
-            <span
-              className="material-symbols-outlined absolute -bottom-4 -right-4 text-9xl opacity-10 rotate-12"
-              data-icon="auto_awesome"
-            >
-              auto_awesome
-            </span>
+            <span className="material-symbols-outlined absolute -bottom-4 -right-4 text-9xl opacity-10 rotate-12">auto_awesome</span>
           </div>
         </div>
-      </div>
-      {/* Floating Action Button (FAB) */}
-      <div className="fixed bottom-8 right-8 z-50">
-        <button className="w-16 h-16 bg-primary text-white rounded-full shadow-2xl shadow-primary/40 flex items-center justify-center hover:scale-110 active:scale-90 transition-all">
-          <span className="material-symbols-outlined text-3xl" data-icon="search">
-            search
-          </span>
-        </button>
       </div>
     </main>
   );
