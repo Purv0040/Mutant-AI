@@ -1,16 +1,8 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Link, useLocation } from 'react-router-dom';
 
 const DashboardSidebar = () => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { logout } = useAuth();
   const isActive = (path) => location.pathname === path;
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
 
   return (
     <aside className="flex flex-col w-64 h-full p-4 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-r-3xl h-screen sticky left-0 top-0 shadow-xl shadow-indigo-500/5 z-40">
@@ -142,25 +134,8 @@ const DashboardSidebar = () => {
           <span>Settings</span>
         </Link>
       </nav>
-      <div className="mt-auto pt-4 border-t border-surface-container">
-        <Link
-          to="#"
-          className="flex items-center gap-3 px-4 py-3 rounded-xl font-manrope text-sm font-medium tracking-tight text-slate-500 dark:text-slate-400 hover:text-indigo-500 hover:bg-indigo-50/30 transition-all scale-95 active:scale-90"
-        >
-          <span className="material-symbols-outlined">account_circle</span>
-          <span>Profile</span>
-        </Link>
-        <button
-          type="button"
-          id="logout-btn"
-          onClick={handleLogout}
-          className="flex items-center gap-3 px-4 py-3 font-manrope text-sm font-medium tracking-tight rounded-xl text-slate-500 dark:text-slate-400 hover:text-indigo-500 hover:bg-indigo-50/30 transition-all duration-300"
-        >
-          <span className="material-symbols-outlined">logout</span>
-          <span>Logout</span>
-        </button>
-      </div>
     </aside>
+
   );
 };
 

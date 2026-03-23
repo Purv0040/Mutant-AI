@@ -27,6 +27,11 @@ class UpdateProfileRequest(BaseModel):
     email: EmailStr
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=6)
+
+
 @router.post("/register")
 def register(payload: RegisterRequest):
     try:
@@ -107,6 +112,36 @@ def login(payload: LoginRequest):
         raise
     except Exception as e:
         print(f"Login error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.post("/change-password")
+def change_password(payload: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
+    """POST - Change the authenticated user's password"""
+    try:
+        db = get_db()
+        user_id = ObjectId(current_user["user_id"]) if len(str(current_user["user_id"])) == 24 else current_user["user_id"]
+
+        user = db["users"].find_one({"_id": user_id})
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        if not verify_password(payload.current_password, user["hashed_password"]):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+
+        db["users"].update_one(
+            {"_id": user_id},
+            {"$set": {
+                "hashed_password": hash_password(payload.new_password),
+                "password_changed_at": datetime.utcnow()
+            }}
+        )
+
+        return {"message": "Password changed successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Change password error: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 

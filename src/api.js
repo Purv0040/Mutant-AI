@@ -140,6 +140,14 @@ export function deleteUserAccount() {
   })
 }
 
+export function changePassword(payload) {
+  return request('/auth/change-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+
 export function deleteDocument(docId) {
   return request(`/documents/${docId}`, {
     method: 'DELETE',
