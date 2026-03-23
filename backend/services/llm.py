@@ -13,7 +13,7 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 # Hardcoded pool of API keys if environment variable is not comma-separated
 _env_key = os.getenv("OPENROUTER_API_KEY", "").strip()
-OPENROUTER_API_KEYS = [k.strip() for k in _env_key.split(",")] if "," in _env_key and _env_key else [
+OPENROUTER_API_KEYS = [k.strip() for k in _env_key.split(",")] if _env_key else [
     "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",
     "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",
     "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",

@@ -90,6 +90,13 @@ def ask_question(payload: AskRequest, current_user: dict = Depends(get_current_u
 
         try:
             answer = call_openrouter(system_prompt, user_prompt)
+            # Filter sources to only include files that the AI actually cited in its response
+            used_sources = [s for s in sources if str(s["filename"]) in answer]
+            # If the AI failed to explicitly cite, fallback to picking the highest scoring source
+            if not used_sources and sources:
+                used_sources = [sources[0]]
+            sources = used_sources
+            
         except Exception as llm_err:
             print(f"[Ask] LLM error: {llm_err}")
             # Display a much cleaner and concise snippet list when the model completely fails
