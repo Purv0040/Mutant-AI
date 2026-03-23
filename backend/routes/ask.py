@@ -92,18 +92,20 @@ def ask_question(payload: AskRequest, current_user: dict = Depends(get_current_u
             answer = call_openrouter(system_prompt, user_prompt)
         except Exception as llm_err:
             print(f"[Ask] LLM error: {llm_err}")
-            # Return the raw context as fallback rather than a 500
+            # Display a much cleaner and concise snippet list when the model completely fails
+            snippets = []
+            for s in sources:
+                matching_text = next((m.get("metadata", {}).get("text", "").strip() 
+                                      for m in matches 
+                                      if m.get("metadata", {}).get("filename") == s["filename"]), "")
+                if matching_text:
+                    snippet = matching_text[:120].replace('\n', ' ') + "..."
+                    snippets.append(f"• **{s['filename']}**: {snippet}")
+            
             answer = (
-                f"I found relevant information in your documents but the AI service is "
-                f"temporarily unavailable (all free models are rate-limited). "
-                f"Here is the raw content found:\n\n"
-                + "\n\n".join(
-                    f"• [{s['filename']}]: " + 
-                    next((m.get("metadata", {}).get("text", "")[:300] 
-                          for m in matches 
-                          if m.get("metadata", {}).get("filename") == s["filename"]), "")
-                    for s in sources
-                )
+                "**Smart Fallback**\n\nThe AI analysis engine is currently handling high traffic. "
+                "However, I was able to find the following exact matches across your documents:\n\n" + 
+                "\n".join(snippets)
             )
 
         return {

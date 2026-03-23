@@ -230,7 +230,8 @@ def summarize_document(
         raise
     except Exception as e:
         print(f"Summarize error: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        # Return a graceful 200 OK payload containing the error to prevent browser console 500 spam
+        return {"error": True, "detail": str(e)}
 
 
 @router.get("/summarize/export")
