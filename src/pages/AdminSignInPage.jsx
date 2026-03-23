@@ -75,8 +75,8 @@ const AdminSignInPage = () => {
           {/* Form Title Section */}
           <div className="mb-8">
             <h2 className="font-headline text-2xl font-bold text-on-surface">Admin Sign In</h2>
-            <p className="text-on-surface-variant mt-1 text-sm bg-yellow-50 text-yellow-800 p-3 rounded-lg border border-yellow-200">
-              <strong>Note:</strong> To upload real documents without "Credential" errors, please log in with a <strong>registered account</strong> on this page instead of the dummy credentials. Logging in here will grant that account Admin privileges.
+            <p className="text-on-surface-variant mt-1 text-sm bg-indigo-50 text-indigo-800 p-3 rounded-lg border border-indigo-200">
+              <strong>Testing Mode:</strong> You can log in using the dummy credentials (<strong>admin@mutant.ai / admin123</strong>) to explore the interface, or you can log in with any real registered account to see live backend integrations.
             </p>
           </div>
 
