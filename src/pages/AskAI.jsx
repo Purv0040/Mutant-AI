@@ -2,19 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import TopBar from '../components/TopBar'
 import ChatMessage from '../components/ChatMessage'
 import DocumentPanel from '../components/DocumentPanel'
-import { askQuestion } from '../api'
+import { askQuestion, upsertChatSession, getChatSessions, deleteChatSession } from '../api'
 
-// ── localStorage helpers ─────────────────────────────────────────────────────
-const STORAGE_KEY = 'mutant_chat_sessions'
-
-function loadSessions() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') } catch { return [] }
-}
-
-function saveSessions(sessions) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions)) } catch {}
-}
-
+// ── helpers ──────────────────────────────────────────────────────────────────
 function makeSessionId() {
   return `sess_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
 }
@@ -40,16 +30,26 @@ function timeAgo(iso) {
 // ── Component ────────────────────────────────────────────────────────────────
 export default function AskAI() {
   // ── Session state ──
-  const [sessions, setSessions]       = useState(loadSessions)
+  const [sessions, setSessions]       = useState([])
   const [sessionId, setSessionId]     = useState(() => makeSessionId())
   const [messages, setMessages]       = useState([])
   const [activeDoc, setActiveDoc]     = useState(null)
+  const [lastAiMsgId, setLastAiMsgId] = useState(null)
+  const [sessionsLoading, setSessionsLoading] = useState(true)
 
   // ── Chat state ──
   const [input, setInput]             = useState('')
   const [loading, setLoading]         = useState(false)
   const [error, setError]             = useState('')
   const messagesEndRef                = useRef(null)
+  const currentActionIdRef            = useRef(0)
+  // ← Refs so the persist effect always sees the CURRENT sessionId / title
+  //   even though it only runs when `messages` changes.
+  const sessionIdRef                  = useRef(sessionId)
+  const activeTitleRef                = useRef('New Chat')
+
+  // Keep refs in sync with state
+  useEffect(() => { sessionIdRef.current = sessionId }, [sessionId])
 
   // ── UI state ──
   const [menuOpen, setMenuOpen]       = useState(false)
@@ -62,26 +62,57 @@ export default function AskAI() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
-  // ── Persist current session whenever messages change ──
+  // ── Load sessions from DB on mount ──
   useEffect(() => {
-    if (messages.length === 0) return          // don't save empty sessions
-    const firstQ = messages.find((m) => m.role === 'user')?.text || ''
+    setSessionsLoading(true)
+    getChatSessions()
+      .then((data) => {
+        // Normalise: backend uses session_id / updated_at / created_at
+        const normalised = data.map((s) => ({
+          id:        s.session_id,
+          title:     s.title,
+          messages:  s.messages || [],
+          activeDoc: s.active_doc || null,
+          updatedAt: s.updated_at,
+          createdAt: s.created_at,
+        }))
+        setSessions(normalised)
+      })
+      .catch((err) => console.warn('[Chat] Could not load sessions from DB:', err))
+      .finally(() => setSessionsLoading(false))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Persist current session to DB whenever messages change (debounced) ──
+  useEffect(() => {
+    if (messages.length === 0) return
+    const currId  = sessionIdRef.current          // always the LATEST sessionId
+    const firstQ  = messages.find((m) => m.role === 'user')?.text || ''
+
+    // Optimistic local update — read existing title from live state via setter
     setSessions((prev) => {
-      const existing = prev.find((s) => s.id === sessionId)
-      const updated  = {
-        id:        sessionId,
-        title:     existing?.title || makeTitle(firstQ),
-        messages,
-        activeDoc,
+      const existing = prev.find((s) => s.id === currId)
+      const title    = existing?.title || makeTitle(firstQ)
+      activeTitleRef.current = title              // cache for DB write below
+      const rest = prev.filter((s) => s.id !== currId)
+      return [{
+        id: currId, title, messages, activeDoc,
         updatedAt: new Date().toISOString(),
         createdAt: existing?.createdAt || new Date().toISOString(),
-      }
-      const rest    = prev.filter((s) => s.id !== sessionId)
-      const next    = [updated, ...rest].slice(0, 50)   // keep last 50 sessions
-      saveSessions(next)
-      return next
+      }, ...rest].slice(0, 50)
     })
-  }, [messages])   // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Debounce DB write 600 ms — captures currId so it never becomes stale
+    const timer = setTimeout(() => {
+      upsertChatSession({
+        session_id: currId,
+        title:      activeTitleRef.current,
+        messages,
+        active_doc: activeDoc,
+      }).catch((err) => console.warn('[Chat] DB save failed:', err))
+    }, 600)
+
+    return () => clearTimeout(timer)
+  }, [messages]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Close menus on outside click ──
   useEffect(() => {
@@ -99,23 +130,31 @@ export default function AskAI() {
   // ── Send message ──
   const sendMessage = useCallback(async (question) => {
     if (!question?.trim()) return
+    const actionId = Date.now()
+    currentActionIdRef.current = actionId
+
     setMessages((prev) => [...prev, { id: Date.now(), role: 'user', text: question }])
     setInput('')
     setLoading(true)
     setError('')
     try {
       const data = await askQuestion(question)
+      if (currentActionIdRef.current !== actionId) return // Abort if user edited or started new chat
+
       const rawSources = data.source_details
         ? data.source_details.map((s) => `${s.filename} · p.${s.page}`)
         : (data.sources || [])
       const sourceChips = rawSources.map((s) =>
         typeof s === 'object' ? `${s.filename} (score: ${s.score})` : s
       )
+      const newAiId = Date.now() + 1
+      setLastAiMsgId(newAiId)
       setMessages((prev) => [
         ...prev,
-        { id: Date.now() + 1, role: 'ai', text: data.answer, sources: sourceChips, provider: data.provider || 'ai' },
+        { id: newAiId, role: 'ai', text: data.answer, sources: sourceChips, provider: data.provider || 'ai' },
       ])
     } catch (err) {
+      if (currentActionIdRef.current !== actionId) return
       setError(err.message)
     } finally {
       setLoading(false)
@@ -124,8 +163,20 @@ export default function AskAI() {
 
   const handleSend = () => sendMessage(input)
 
+  const handleEditMessage = (id, text) => {
+    currentActionIdRef.current = Date.now() // Invalidate pending requests
+    const index = messages.findIndex(m => m.id === id)
+    if (index !== -1) {
+      setMessages(messages.slice(0, index))
+      setInput(text)
+      setLoading(false)
+      setTimeout(() => document.getElementById('chat-input')?.focus(), 0)
+    }
+  }
+
   // ── New Chat ──
   const handleNewChat = () => {
+    currentActionIdRef.current = Date.now() // Invalidate pending requests
     setSessionId(makeSessionId())
     setMessages([])
     setInput('')
@@ -149,11 +200,10 @@ export default function AskAI() {
   // ── Delete a session ──
   const handleDeleteSession = (e, sessId) => {
     e.stopPropagation()
-    setSessions((prev) => {
-      const next = prev.filter((s) => s.id !== sessId)
-      saveSessions(next)
-      return next
-    })
+    // Optimistic UI removal
+    setSessions((prev) => prev.filter((s) => s.id !== sessId))
+    // DB delete
+    deleteChatSession(sessId).catch((err) => console.warn('[Chat] DB delete failed:', err))
     if (sessId === sessionId) handleNewChat()
   }
 
@@ -254,10 +304,10 @@ export default function AskAI() {
               const lastMsg  = sess.messages?.filter((m) => m.role === 'ai').pop()?.text || ''
 
               return (
-                <button
+                <div
                   key={sess.id}
                   onClick={() => handleLoadSession(sess)}
-                  className={`w-full flex items-start gap-3 px-3 py-3 rounded-xl text-left transition-all group border ${
+                  className={`w-full cursor-pointer flex items-start gap-3 px-3 py-3 rounded-xl text-left transition-all group border ${
                     isActive
                       ? 'bg-blue-50 border-blue-200 shadow-sm'
                       : 'hover:bg-gray-50 border-transparent hover:border-gray-200'
@@ -302,7 +352,7 @@ export default function AskAI() {
                   >
                     <span className="material-symbols-outlined text-[13px] text-red-500">delete</span>
                   </button>
-                </button>
+                </div>
               )
             })}
           </div>
@@ -386,14 +436,7 @@ export default function AskAI() {
             )}
           </div>
 
-          {/* Chat title strip (when session has title) */}
-          {currentSession?.title && messages.length > 0 && (
-            <div className="absolute top-3 left-16 right-4 z-30 flex items-center">
-              <span className="text-[12px] font-semibold text-gray-500 truncate max-w-xs" title={currentSession.title}>
-                {currentSession.title}
-              </span>
-            </div>
-          )}
+
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto scrollbar-thin px-8 py-8 space-y-6">
@@ -428,6 +471,8 @@ export default function AskAI() {
                 text={msg.text}
                 sources={msg.sources}
                 provider={msg.provider}
+                onEdit={() => handleEditMessage(msg.id, msg.text)}
+                isNew={msg.id === lastAiMsgId}
               />
             ))}
 

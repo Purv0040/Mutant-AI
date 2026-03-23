@@ -159,3 +159,30 @@ export function getDocumentPreviewUrl(docId) {
   const base = import.meta.env.VITE_API_URL || 'http://localhost:8000'
   return `${base}/documents/${docId}/preview?token=${encodeURIComponent(token || '')}`
 }
+
+// ── Chat Session API ──────────────────────────────────────────────────────────
+
+/** Upsert (save/update) a full chat session to MongoDB */
+export function upsertChatSession(sessionData) {
+  return request('/chat/sessions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(sessionData),
+  })
+}
+
+/** Fetch all sessions for the logged-in user */
+export function getChatSessions() {
+  return request('/chat/sessions')
+}
+
+/** Fetch a single session by its session_id */
+export function getChatSession(sessionId) {
+  return request(`/chat/sessions/${sessionId}`)
+}
+
+/** Delete a session from MongoDB */
+export function deleteChatSession(sessionId) {
+  return request(`/chat/sessions/${sessionId}`, { method: 'DELETE' })
+}
+
