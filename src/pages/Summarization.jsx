@@ -216,7 +216,7 @@ export default function Summarization() {
   // ─────────────────────────────────────────────────────────────────── render ─
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="absolute inset-0 flex flex-col">
       <TopBar
         title="Document Summarization"
         actions={

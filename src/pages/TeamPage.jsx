@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getDocuments } from '../api';
+import { getDocuments, getUploadRequests, updateUploadRequestStatus } from '../api';
 
 const TeamPage = () => {
   // State management
@@ -29,9 +29,23 @@ const TeamPage = () => {
   const [detailedDepartment, setDetailedDepartment] = useState(null);
   const [departmentDocs, setDepartmentDocs] = useState([]);
 
+  const loadUploadRequests = async () => {
+    try {
+      const requests = await getUploadRequests();
+      setUploadRequests(Array.isArray(requests) ? requests : []);
+    } catch (err) {
+      console.error('Failed to load upload requests:', err);
+    }
+  };
+
   useEffect(() => {
-    const requests = JSON.parse(localStorage.getItem('mutant_upload_requests') || '[]');
-    setUploadRequests(requests);
+    loadUploadRequests();
+  }, [activeTab]);
+
+  // Poll every 5 seconds so admin sees new requests without refreshing
+  useEffect(() => {
+    const interval = setInterval(loadUploadRequests, 5000);
+    return () => clearInterval(interval);
   }, []);
   const [permissions, setPermissions] = useState({
     Admin: {
@@ -209,16 +223,22 @@ const TeamPage = () => {
     ));
   };
 
-  const handleApproveRequest = (id) => {
-    const updated = uploadRequests.map(req => req.id === id ? { ...req, status: 'Approved' } : req);
-    setUploadRequests(updated);
-    localStorage.setItem('mutant_upload_requests', JSON.stringify(updated));
+  const handleApproveRequest = async (id) => {
+    try {
+      const updated = await updateUploadRequestStatus(id, 'Approved');
+      setUploadRequests(prev => prev.map(req => req.id === id ? { ...req, status: 'Approved' } : req));
+    } catch (err) {
+      console.error('Approve failed:', err);
+    }
   };
 
-  const handleRejectRequest = (id) => {
-    const updated = uploadRequests.map(req => req.id === id ? { ...req, status: 'Rejected' } : req);
-    setUploadRequests(updated);
-    localStorage.setItem('mutant_upload_requests', JSON.stringify(updated));
+  const handleRejectRequest = async (id) => {
+    try {
+      await updateUploadRequestStatus(id, 'Rejected');
+      setUploadRequests(prev => prev.map(req => req.id === id ? { ...req, status: 'Rejected' } : req));
+    } catch (err) {
+      console.error('Reject failed:', err);
+    }
   };
 
   const handleDepartmentClick = async (deptName) => {
@@ -270,22 +290,27 @@ const TeamPage = () => {
         {/* Tab Navigation */}
         <div className="flex items-center px-8 border-t border-slate-100">
           <nav className="flex items-center gap-1">
-            {[
+          {[
               { id: 'overview', label: 'Overview' },
               { id: 'roles', label: 'Roles' },
               { id: 'permissions', label: 'Permissions' },
-              { id: 'requests', label: 'Upload Requests' },
+              { id: 'requests', label: 'Upload Requests', badge: uploadRequests.filter(r => r.status === 'Pending').length },
             ].map(tab => (
               <button
                 key={tab.id}
                 onClick={() => { setActiveTab(tab.id); setDetailedDepartment(null); }}
-                className={`px-6 py-4 text-sm font-semibold uppercase tracking-wider transition-all border-b-2 ${
+                className={`px-6 py-4 text-sm font-semibold uppercase tracking-wider transition-all border-b-2 flex items-center gap-2 ${
                   activeTab === tab.id
                     ? 'text-indigo-600 border-indigo-600'
                     : 'text-slate-600 border-transparent hover:text-indigo-500'
                 }`}
               >
                 {tab.label}
+                {tab.badge > 0 && (
+                  <span className="bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                    {tab.badge}
+                  </span>
+                )}
               </button>
             ))}
           </nav>
@@ -926,10 +951,24 @@ const TeamPage = () => {
         {/* UPLOAD REQUESTS TAB */}
         {activeTab === 'requests' && (
           <div className="bg-white rounded-lg mt-8 p-8 shadow-sm border border-slate-200">
-            <h3 className="text-xl font-bold text-slate-900 font-headline mb-6 flex items-center gap-2">
-              <span className="material-symbols-outlined text-indigo-600">publish</span>
-              Pending Upload Requests
-            </h3>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-slate-900 font-headline flex items-center gap-2">
+                <span className="material-symbols-outlined text-indigo-600">publish</span>
+                Upload Requests
+                {uploadRequests.filter(r => r.status === 'Pending').length > 0 && (
+                  <span className="bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                    {uploadRequests.filter(r => r.status === 'Pending').length} pending
+                  </span>
+                )}
+              </h3>
+              <button
+                onClick={loadUploadRequests}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-semibold hover:bg-indigo-100 transition-colors"
+              >
+                <span className="material-symbols-outlined text-base">refresh</span>
+                Refresh
+              </button>
+            </div>
             {uploadRequests.length === 0 ? (
               <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200">
                 <span className="material-symbols-outlined text-4xl text-slate-300 mb-3">inbox</span>

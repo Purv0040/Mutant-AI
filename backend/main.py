@@ -8,6 +8,7 @@ from auth.router import router as auth_router
 from routes.ask import router as ask_router
 from routes.categorize import router as categorize_router
 from routes.chat import router as chat_router
+from routes.requests import router as requests_router
 from routes.summarize import router as summarize_router
 from routes.upload import router as upload_router
 
@@ -35,6 +36,7 @@ app.include_router(ask_router)
 app.include_router(chat_router)
 app.include_router(summarize_router)
 app.include_router(categorize_router)
+app.include_router(requests_router)
 
 
 @app.on_event("startup")

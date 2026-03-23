@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getDocuments } from '../api'
+import { createUploadRequest, getDocuments } from '../api'
 import { useAuth } from '../context/AuthContext'
 import UploadRequestModal from '../components/UploadRequestModal'
 
@@ -153,7 +153,7 @@ const DashboardPage = () => {
           <div className="grid grid-cols-1 gap-4">
             <button
               className="flex items-center justify-between p-6 bg-surface-container-highest text-on-surface rounded-lg transition-all hover:bg-surface-container-high active:scale-95 group"
-              onClick={() => navigate('/categorization')}
+              onClick={() => setIsUploadModalOpen(true)}
             >
               <div className="flex items-center gap-4">
                 <span className="material-symbols-outlined text-3xl text-primary">{isAdmin ? 'cloud_upload' : 'publish'}</span>
@@ -187,22 +187,20 @@ const DashboardPage = () => {
       <UploadRequestModal 
         isOpen={isUploadModalOpen} 
         onClose={() => setIsUploadModalOpen(false)}
-        onSubmit={(data) => {
-          const newRequest = {
-            id: Date.now().toString(),
-            fileName: data.file.name,
-            fileSize: data.file.size,
-            accessMode: data.accessMode,
-            requestedBy: user?.name || 'Unknown User',
-            requestedByEmail: user?.email || '',
-            status: 'Pending',
-            date: new Date().toISOString()
-          };
-          const existing = JSON.parse(localStorage.getItem('mutant_upload_requests') || '[]');
-          localStorage.setItem('mutant_upload_requests', JSON.stringify([newRequest, ...existing]));
-          setIsUploadModalOpen(false);
-          // In a real app we'd use a proper toast notification system
-          alert('Upload request sent to Admin successfully.');
+        defaultAccessMode={!isAdmin ? (user?.department || 'All') : 'All'}
+        onSubmit={async (data) => {
+          try {
+            await createUploadRequest({
+              file_name: data.file.name,
+              file_size: data.file.size,
+              access_mode: data.accessMode,
+              department: data.accessMode,
+            });
+            setIsUploadModalOpen(false);
+            alert(`Upload request sent to Admin for the ${data.accessMode} department!`);
+          } catch (err) {
+            alert('Failed to send request: ' + err.message);
+          }
         }}
       />
     </main>

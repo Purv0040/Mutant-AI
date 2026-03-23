@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { deleteDocument, getDocumentChunkCounts, getDocuments, uploadDocument } from '../api'
+import UploadRequestModal from './UploadRequestModal'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -188,6 +189,7 @@ export default function DocumentPanel({ onUploaded }) {
   const [checkingChunks, setCheckingChunks] = useState(false)
   const [error, setError] = useState('')
   const [previewFile, setPreviewFile] = useState(null)
+  const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const fileInputRef = useRef(null)
 
   const loadDocuments = async () => {
@@ -247,6 +249,27 @@ export default function DocumentPanel({ onUploaded }) {
     }
   }
 
+  const handleModalSubmit = async ({ file, accessMode }) => {
+    if (!file) return
+    setUploading(true)
+    setUploadProgress(0)
+    setError('')
+    try {
+      const result = await uploadDocument(file, {
+        onProgress: (percent) => setUploadProgress(percent),
+        accessMode,
+      })
+      await loadDocuments()
+      await loadChunkCounts()
+      if (onUploaded) onUploaded(result.filename)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setUploading(false)
+      setUploadProgress(0)
+    }
+  }
+
   const handleDelete = async (docId) => {
     setDeletingId(docId)
     setError('')
@@ -267,6 +290,13 @@ export default function DocumentPanel({ onUploaded }) {
 
   return (
     <>
+      {/* Upload Document Modal */}
+      <UploadRequestModal
+        isOpen={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+        onSubmit={handleModalSubmit}
+      />
+
       {/* Preview Modal */}
       {previewFile && (
         <PreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />
@@ -350,16 +380,9 @@ export default function DocumentPanel({ onUploaded }) {
           {uploading && (
             <p className="text-[11px] text-blue-700 mb-2">Uploading document: {uploadProgress}%</p>
           )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            accept=".pdf,.docx,.csv"
-            onChange={handleSelectFile}
-          />
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => setUploadModalOpen(true)}
             disabled={uploading}
             className="w-full border border-dashed border-outline-variant rounded-card p-4 text-center hover:border-accent hover:bg-accent/5 transition-all cursor-pointer disabled:opacity-60"
           >

@@ -223,7 +223,7 @@ export default function AskAI() {
   const currentSession = sessions.find((s) => s.id === sessionId)
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-white">
+    <div className="absolute inset-0 flex flex-col overflow-hidden bg-white">
       <TopBar
         title="Ask AI Intelligence"
         actions={

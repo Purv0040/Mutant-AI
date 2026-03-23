@@ -1,13 +1,16 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
-export default function UploadRequestModal({ isOpen, onClose, onSubmit }) {
+export default function UploadRequestModal({ isOpen, onClose, onSubmit, defaultAccessMode = 'All' }) {
   const { isAdmin } = useAuth();
   const [file, setFile] = useState(null);
-  const [accessMode, setAccessMode] = useState('All');
+  const [accessMode, setAccessMode] = useState(defaultAccessMode);
   const fileInputRef = useRef(null);
 
-  if (!isOpen) return null;
+  // Sync when defaultAccessMode changes (e.g. different user opens modal)
+  useEffect(() => {
+    setAccessMode(defaultAccessMode);
+  }, [defaultAccessMode, isOpen]);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -28,9 +31,11 @@ export default function UploadRequestModal({ isOpen, onClose, onSubmit }) {
     if (!file) return;
     onSubmit({ file, accessMode });
     setFile(null);
-    setAccessMode('All');
+    setAccessMode(defaultAccessMode);
     onClose();
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
@@ -105,22 +110,29 @@ export default function UploadRequestModal({ isOpen, onClose, onSubmit }) {
             <label className="block text-sm font-bold text-slate-700 font-headline mb-2">
               Target Department (Access Mode)
             </label>
-            <select
-              value={accessMode}
-              onChange={(e) => setAccessMode(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all appearance-none"
-              style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23475569' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right 16px center',
-              }}
-            >
-              <option value="All">All Departments</option>
-              <option value="Engineering">Engineering</option>
-              <option value="Product">Product</option>
-              <option value="Marketing">Marketing</option>
-              <option value="Design">Design</option>
-            </select>
+            {!isAdmin && defaultAccessMode !== 'All' ? (
+              <div className="w-full px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-lg text-sm text-indigo-700 font-semibold flex items-center gap-2">
+                <span className="material-symbols-outlined text-sm">lock</span>
+                {accessMode} (your department)
+              </div>
+            ) : (
+              <select
+                value={accessMode}
+                onChange={(e) => setAccessMode(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all appearance-none"
+                style={{
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23475569' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 16px center',
+                }}
+              >
+                <option value="All">All Departments</option>
+                <option value="Engineering">Engineering</option>
+                <option value="Product">Product</option>
+                <option value="Marketing">Marketing</option>
+                <option value="Design">Design</option>
+              </select>
+            )}
           </div>
 
           {/* Footer Actions */}

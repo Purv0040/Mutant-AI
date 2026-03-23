@@ -271,3 +271,29 @@ export function deleteChatSession(sessionId) {
   return request(`/chat/sessions/${sessionId}`, { method: 'DELETE' })
 }
 
+// ── Upload Requests API ───────────────────────────────────────────────────────
+
+/** User submits an upload request (saved to MongoDB) */
+export function createUploadRequest(payload) {
+  return request('/upload-requests', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+
+/** Fetch all upload requests (admin gets all; user gets their own) */
+export function getUploadRequests() {
+  return request('/upload-requests')
+}
+
+/** Admin approves or rejects a request */
+export function updateUploadRequestStatus(requestId, reqStatus) {
+  return request(`/upload-requests/${requestId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: reqStatus }),
+  })
+}
+
+
