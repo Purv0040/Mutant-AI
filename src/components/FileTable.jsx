@@ -49,6 +49,8 @@ const tableData = [
 const typeStyle = {
   PDF: 'bg-red-100 text-red-700',
   XLSX: 'bg-green-100 text-green-700',
+  CSV: 'bg-emerald-100 text-emerald-700',
+  DOCX: 'bg-blue-100 text-blue-700',
   PPT: 'bg-amber-100 text-amber-700',
 }
 
@@ -96,13 +98,13 @@ export default function FileTable({ data = tableData }) {
               <td className="py-3 px-4">
                 <div className="flex items-center gap-2">
                   <span className="text-base">
-                    {row.type === 'PDF' ? '📄' : row.type === 'XLSX' ? '📊' : '📋'}
+                    {row.type === 'PDF' || row.type === 'DOCX' ? '📄' : row.type === 'XLSX' || row.type === 'CSV' ? '📊' : '📋'}
                   </span>
                   <span className="font-medium text-on-surface truncate max-w-[200px]">{row.name}</span>
                 </div>
               </td>
               <td className="py-3 px-4">
-                <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${typeStyle[row.type]}`}>
+                <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${typeStyle[row.type] || 'bg-surface-container text-on-surface-variant'}`}>
                   {row.type}
                 </span>
               </td>
