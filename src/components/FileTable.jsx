@@ -4,6 +4,7 @@ const tableData = [
     type: 'PDF',
     category: 'Finance',
     accessMode: 'All Departments',
+    dateLabel: '15 Nov 2024',
     tags: ['Vendor: Infosys', '₹2,40,000', 'Due: 15 Nov'],
     confidence: 94,
   },
@@ -12,6 +13,7 @@ const tableData = [
     type: 'PDF',
     category: 'HR',
     accessMode: 'HR',
+    dateLabel: '08 Nov 2024',
     tags: ['Name: Priya Sharma', 'Role: SDE-2'],
     confidence: 97,
   },
@@ -20,6 +22,7 @@ const tableData = [
     type: 'PPT',
     category: 'Management',
     accessMode: 'Product',
+    dateLabel: '02 Nov 2024',
     tags: ['22 slides', '3 milestones', 'Q4 launch'],
     confidence: 89,
   },
@@ -28,6 +31,7 @@ const tableData = [
     type: 'PDF',
     category: 'Legal',
     accessMode: 'Legal',
+    dateLabel: '29 Oct 2024',
     tags: ['Party: ClientX', 'Valid: 2 yrs'],
     confidence: 91,
   },
@@ -36,6 +40,7 @@ const tableData = [
     type: 'XLSX',
     category: 'IT / Infra',
     accessMode: 'Engineering',
+    dateLabel: '24 Oct 2024',
     tags: ['₹18.4L total', 'AWS/GCP'],
     confidence: 86,
   },
@@ -77,6 +82,7 @@ export default function FileTable({ data = tableData }) {
             <th className="text-left py-2.5 px-4 font-medium text-on-surface-variant text-[11px] uppercase tracking-wider">Type</th>
             <th className="text-left py-2.5 px-4 font-medium text-on-surface-variant text-[11px] uppercase tracking-wider">Category</th>
             <th className="text-left py-2.5 px-4 font-medium text-on-surface-variant text-[11px] uppercase tracking-wider">Access Mode</th>
+            <th className="text-left py-2.5 px-4 font-medium text-on-surface-variant text-[11px] uppercase tracking-wider">Date</th>
             <th className="text-left py-2.5 px-4 font-medium text-on-surface-variant text-[11px] uppercase tracking-wider">Extracted Info</th>
             <th className="text-left py-2.5 px-4 font-medium text-on-surface-variant text-[11px] uppercase tracking-wider w-36">Confidence</th>
           </tr>
@@ -111,8 +117,11 @@ export default function FileTable({ data = tableData }) {
                 </span>
               </td>
               <td className="py-3 px-4">
+                <span className="text-[12px] font-medium text-on-surface-variant">{row.dateLabel || 'N/A'}</span>
+              </td>
+              <td className="py-3 px-4">
                 <div className="flex flex-wrap gap-1">
-                  {row.tags.map((tag) => (
+                  {(row.tags || []).map((tag) => (
                     <span key={tag} className="px-2 py-0.5 bg-surface-container text-on-surface-variant rounded text-[11px]">
                       {tag}
                     </span>
