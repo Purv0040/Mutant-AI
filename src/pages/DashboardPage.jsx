@@ -153,7 +153,7 @@ const DashboardPage = () => {
           <div className="grid grid-cols-1 gap-4">
             <button
               className="flex items-center justify-between p-6 bg-surface-container-highest text-on-surface rounded-lg transition-all hover:bg-surface-container-high active:scale-95 group"
-              onClick={() => navigate('/categorization')}
+              onClick={() => isAdmin ? navigate('/documents') : setIsUploadModalOpen(true)}
             >
               <div className="flex items-center gap-4">
                 <span className="material-symbols-outlined text-3xl text-primary">{isAdmin ? 'cloud_upload' : 'publish'}</span>
