@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { getDocuments } from '../api'
 
 const navItems = [
   {
@@ -57,14 +59,25 @@ const navItems = [
   },
 ]
 
-const recentChats = [
-  { id: 1, label: 'Leave policy for interns' },
-  { id: 2, label: 'IT expense Q3 report' },
-  { id: 3, label: 'Q3 revenue data analysis' },
-]
-
 export default function Sidebar() {
   const { user, logout } = useAuth()
+  const [recentDocs, setRecentDocs] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const loadRecentDocs = async () => {
+      try {
+        const docs = await getDocuments()
+        const sorted = [...docs].sort((a, b) => new Date(b.uploaded_at || 0) - new Date(a.uploaded_at || 0)).slice(0, 5)
+        setRecentDocs(sorted)
+      } catch (err) {
+        console.error('Failed to load recent docs', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadRecentDocs()
+  }, [])
 
   return (
     <aside className="w-[200px] min-w-[200px] h-screen bg-sidebar flex flex-col overflow-hidden">
@@ -107,23 +120,33 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Recent Chats */}
+      {/* Recent Activity (Replica of Archival Log) */}
       <div className="px-2 mt-6 flex-1 overflow-hidden">
         <p className="px-3 text-[10px] font-semibold tracking-widest text-white/30 uppercase mb-2">
-          Recent Chats
+          Recent Activity
         </p>
-        <div className="flex flex-col gap-0.5">
-          {recentChats.map((chat) => (
+        <div className="flex flex-col gap-0.5 max-h-[250px] overflow-y-auto scrollbar-none">
+          {loading && <p className="px-3 text-[11px] text-white/20">Syncing...</p>}
+          {!loading && recentDocs.map((doc) => (
             <button
-              key={chat.id}
-              className="flex items-center gap-2 px-3 py-2 rounded-btn text-left w-full text-[12px] text-white/40 hover:text-white/70 hover:bg-white/5 transition-all"
+              key={doc.id}
+              className="flex items-start gap-2 px-3 py-2 rounded-btn text-left w-full text-[11px] text-white/40 hover:text-white/70 hover:bg-white/5 transition-all group"
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mt-0.5 shrink-0">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
               </svg>
-              <span className="truncate">{chat.label}</span>
+              <div className="flex-1 min-w-0">
+                <span className="block truncate">{doc.filename}</span>
+                <span className="text-[9px] opacity-40 uppercase tracking-tighter">
+                  {doc.status || 'Verified'}
+                </span>
+              </div>
             </button>
           ))}
+          {!loading && recentDocs.length === 0 && (
+            <p className="px-3 text-[10px] text-white/20 italic">No archival logs</p>
+          )}
         </div>
       </div>
 

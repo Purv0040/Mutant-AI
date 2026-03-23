@@ -145,3 +145,9 @@ export function deleteDocument(docId) {
     method: 'DELETE',
   })
 }
+
+export function getDocumentPreviewUrl(docId) {
+  const token = localStorage.getItem('mutant_token')
+  const base = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+  return `${base}/documents/${docId}/preview?token=${encodeURIComponent(token || '')}`
+}

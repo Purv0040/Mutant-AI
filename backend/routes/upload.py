@@ -1,10 +1,12 @@
 import os
 import shutil
+import mimetypes
 from pathlib import Path
 from datetime import datetime
 from bson import ObjectId
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 
 from auth.dependencies import get_current_user
 from database import get_db
@@ -173,6 +175,47 @@ def get_document_chunk_counts(current_user: dict = Depends(get_current_user)):
         return result
     except Exception as e:
         print(f"Get chunk counts error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.get("/documents/{doc_id}/preview")
+def preview_document(
+    doc_id: str,
+    token: str = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Stream the original file so the browser can preview it (token accepted via query param for iframe use)."""
+    try:
+        db = get_db()
+        user_id = ObjectId(current_user["user_id"]) if len(str(current_user["user_id"])) == 24 else current_user["user_id"]
+
+        try:
+            doc_obj_id = ObjectId(doc_id)
+        except Exception:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid document ID")
+
+        doc = db["documents"].find_one({"_id": doc_obj_id, "user_id": user_id})
+        if not doc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+        file_path = doc.get("file_path")
+        if not file_path or not os.path.exists(file_path):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found on disk")
+
+        mime_type, _ = mimetypes.guess_type(file_path)
+        if not mime_type:
+            mime_type = "application/octet-stream"
+
+        return FileResponse(
+            path=file_path,
+            media_type=mime_type,
+            filename=doc.get("filename", Path(file_path).name),
+            headers={"Content-Disposition": f'inline; filename="{doc.get("filename", Path(file_path).name)}"'},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Preview document error: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
