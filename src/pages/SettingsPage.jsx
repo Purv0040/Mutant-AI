@@ -83,7 +83,7 @@ function PasswordStrength({ password }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 const SettingsPage = () => {
-  const { user, logout } = useAuth()
+  const { user, logout, isAdmin } = useAuth()
   const navigate = useNavigate()
 
   // ── Tab state ──
@@ -128,6 +128,14 @@ const SettingsPage = () => {
   const displayName  = profile?.name  || user?.name  || '—'
   const displayEmail = profile?.email || user?.email || '—'
   const initials     = displayName.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
+  const resolvedRole = String(profile?.role || user?.role || 'user').toLowerCase()
+  const resolvedDepartment = profile?.department || user?.department || ''
+  const accessRoleLabel =
+    resolvedRole === 'admin'
+      ? 'Admin'
+      : resolvedDepartment
+        ? `Member (${resolvedDepartment})`
+        : 'Member'
 
   // ── Handlers ──
   const handleChangePassword = async (e) => {
@@ -239,40 +247,42 @@ const SettingsPage = () => {
                 </div>
               </div>
 
-              {/* Knowledge Storage + Indexing Engine */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="bg-surface-container-lowest p-8 rounded-lg shadow-xl shadow-indigo-500/5 flex flex-col justify-between">
-                  <div>
-                    <h3 className="text-xl font-bold font-headline mb-1">Knowledge Storage</h3>
-                    <p className="text-sm text-on-surface-variant mb-8">Total vector memory allocation.</p>
+              {/* Knowledge Storage + Indexing Engine (Admin only) */}
+              {isAdmin && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="bg-surface-container-lowest p-8 rounded-lg shadow-xl shadow-indigo-500/5 flex flex-col justify-between">
+                    <div>
+                      <h3 className="text-xl font-bold font-headline mb-1">Knowledge Storage</h3>
+                      <p className="text-sm text-on-surface-variant mb-8">Total vector memory allocation.</p>
+                    </div>
+                    <div className="space-y-6">
+                      <div className="flex justify-between text-sm font-medium">
+                        <span className="text-on-surface-variant">Usage</span>
+                        <span className="text-primary font-bold">12.4 GB / 50 GB</span>
+                      </div>
+                      <div className="relative h-3 w-full bg-surface-container-low rounded-full overflow-hidden">
+                        <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-primary to-tertiary-container rounded-full" style={{ width: '25%' }} />
+                        <input className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer" max="100" min="0" type="range" defaultValue="25" />
+                      </div>
+                      <p className="text-[11px] text-on-surface-variant leading-relaxed italic">
+                        Optimization running in the background. Next billing cycle in 12 days.
+                      </p>
+                    </div>
                   </div>
-                  <div className="space-y-6">
-                    <div className="flex justify-between text-sm font-medium">
-                      <span className="text-on-surface-variant">Usage</span>
-                      <span className="text-primary font-bold">12.4 GB / 50 GB</span>
+                  <div className="bg-surface-container-lowest p-8 rounded-lg shadow-xl shadow-indigo-500/5">
+                    <h3 className="text-xl font-bold font-headline mb-1">Indexing Engine</h3>
+                    <p className="text-sm text-on-surface-variant mb-8">Synchronize and refresh your data corpus.</p>
+                    <div className="flex flex-col gap-4">
+                      <button className="w-full bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-3">
+                        <span className="material-symbols-outlined text-indigo-600">sync</span>Re-index all clusters
+                      </button>
+                      <button className="w-full border border-outline-variant/30 hover:bg-surface-container-low text-on-surface-variant font-medium py-4 rounded-xl transition-all">
+                        View Indexing Logs
+                      </button>
                     </div>
-                    <div className="relative h-3 w-full bg-surface-container-low rounded-full overflow-hidden">
-                      <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-primary to-tertiary-container rounded-full" style={{ width: '25%' }} />
-                      <input className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer" max="100" min="0" type="range" defaultValue="25" />
-                    </div>
-                    <p className="text-[11px] text-on-surface-variant leading-relaxed italic">
-                      Optimization running in the background. Next billing cycle in 12 days.
-                    </p>
                   </div>
                 </div>
-                <div className="bg-surface-container-lowest p-8 rounded-lg shadow-xl shadow-indigo-500/5">
-                  <h3 className="text-xl font-bold font-headline mb-1">Indexing Engine</h3>
-                  <p className="text-sm text-on-surface-variant mb-8">Synchronize and refresh your data corpus.</p>
-                  <div className="flex flex-col gap-4">
-                    <button className="w-full bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-3">
-                      <span className="material-symbols-outlined text-indigo-600">sync</span>Re-index all clusters
-                    </button>
-                    <button className="w-full border border-outline-variant/30 hover:bg-surface-container-low text-on-surface-variant font-medium py-4 rounded-xl transition-all">
-                      View Indexing Logs
-                    </button>
-                  </div>
-                </div>
-              </div>
+              )}
 
               {/* User Profile Card */}
               <div className="bg-surface-container-lowest p-8 rounded-lg shadow-xl shadow-indigo-500/5">
@@ -318,7 +328,7 @@ const SettingsPage = () => {
                       <div className="space-y-1">
                         <label className="text-[10px] font-label font-bold text-on-surface-variant uppercase tracking-widest">Access Role</label>
                         <div className="flex items-center gap-2">
-                          <span className="text-lg font-semibold text-on-surface">Member</span>
+                          <span className="text-lg font-semibold text-on-surface">{accessRoleLabel}</span>
                           <span className="material-symbols-outlined text-primary text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
                         </div>
                       </div>
