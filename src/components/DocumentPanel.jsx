@@ -234,6 +234,20 @@ export default function DocumentPanel({ onUploaded, onSelectDocument, selectedFi
     return () => window.removeEventListener('mutant:open-upload-modal', openUploadModal)
   }, [])
 
+  useEffect(() => {
+    const openPreviewForDocument = (event) => {
+      const detail = event?.detail || {}
+      const match = files.find((f) =>
+        (detail.id && String(f.id) === String(detail.id)) ||
+        (detail.filename && f.filename === detail.filename)
+      )
+      if (match) setPreviewFile(match)
+    }
+
+    window.addEventListener('mutant:preview-document', openPreviewForDocument)
+    return () => window.removeEventListener('mutant:preview-document', openPreviewForDocument)
+  }, [files])
+
   const handleModalSubmit = async ({ file, accessMode }) => {
     if (!file) return
     setUploading(true)
@@ -331,18 +345,47 @@ export default function DocumentPanel({ onUploaded, onSelectDocument, selectedFi
                 key={file.id}
                 onClick={() => {
                   if (onSelectDocument) {
+                    if (isSelected) {
+                      setPreviewFile(file)
+                      return
+                    }
                     onSelectDocument(file)
                     return
                   }
                   setPreviewFile(file)
                 }}
-                className={`flex items-start gap-2.5 px-2 py-2.5 rounded-btn transition-all cursor-pointer group ${
+                className={`relative flex items-start gap-2.5 px-2 py-2.5 rounded-2xl transition-all cursor-pointer group ${
                   isSelected
                     ? 'bg-blue-50 ring-1 ring-blue-200'
                     : 'hover:bg-surface-container'
                 }`}
                 title={onSelectDocument ? `Click to select ${file.filename}` : `Click to preview ${file.filename}`}
               >
+                {onSelectDocument && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onSelectDocument(isSelected ? null : file)
+                    }}
+                    className={`absolute top-2 left-2 z-10 w-4 h-4 rounded border transition-all duration-200 flex items-center justify-center ${
+                      isSelected
+                        ? 'opacity-100 border-primary bg-primary'
+                        : 'opacity-0 group-hover:opacity-100 border-outline-variant bg-surface'
+                    }`}
+                    title={isSelected ? 'Unselect document' : 'Select document'}
+                  >
+                    <span
+                      className={`material-symbols-outlined text-[12px] transition-opacity ${
+                        isSelected ? 'opacity-100 text-white' : 'opacity-0'
+                      }`}
+                      style={{ fontVariationSettings: "'FILL' 1" }}
+                    >
+                      check
+                    </span>
+                  </button>
+                )}
+
                 <span className="text-lg mt-0.5">{style.icon}</span>
                 <div className="flex-1 min-w-0">
                   <p className={`text-[12px] font-medium text-on-surface truncate ${isSelected ? 'text-blue-700' : 'group-hover:text-primary'}`}>
@@ -364,19 +407,6 @@ export default function DocumentPanel({ onUploaded, onSelectDocument, selectedFi
                     {onSelectDocument ? 'Click to select' : 'Click to preview'}
                   </p>
                 </div>
-                {onSelectDocument && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setPreviewFile(file)
-                    }}
-                    className="text-[10px] px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
-                    title="Preview"
-                  >
-                    View
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={(e) => {

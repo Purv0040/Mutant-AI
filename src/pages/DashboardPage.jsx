@@ -11,6 +11,12 @@ const DashboardPage = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
+  const [toast, setToast] = useState(null)
+
+  const showToast = (message, tone = 'success') => {
+    setToast({ message, tone })
+    setTimeout(() => setToast(null), 3200)
+  }
 
   const loadDashboard = async () => {
     setLoading(true)
@@ -53,6 +59,20 @@ const DashboardPage = () => {
 
   return (
     <main className="w-full h-full p-8 lg:p-12 overflow-y-auto min-h-screen">
+      {toast && (
+        <div className="fixed top-6 right-6 z-[100]">
+          <div
+            className={`px-4 py-3 rounded-xl shadow-lg border text-sm font-semibold max-w-sm ${
+              toast.tone === 'error'
+                ? 'bg-red-50 text-red-700 border-red-200'
+                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            }`}
+          >
+            {toast.message}
+          </div>
+        </div>
+      )}
+
       <header className="flex justify-between items-end mb-12">
         <div>
           <p className="text-label-sm font-label uppercase tracking-[0.2em] text-on-surface-variant mb-2">
@@ -189,7 +209,7 @@ const DashboardPage = () => {
                 accessMode: data.accessMode,
               });
               setIsUploadModalOpen(false);
-              alert(`Document uploaded successfully for the ${data.accessMode} department!`);
+              showToast(`Document uploaded successfully for the ${data.accessMode} department!`);
               loadDashboard();
             } else {
               const formData = new FormData();
@@ -199,10 +219,10 @@ const DashboardPage = () => {
               
               await createUploadRequest(formData);
               setIsUploadModalOpen(false);
-              alert(`Upload request sent to Admin for the ${data.accessMode} department!`);
+              showToast(`Upload request sent to Admin for the ${data.accessMode} department!`);
             }
           } catch (err) {
-            alert('Failed to process upload: ' + err.message);
+            showToast('Failed to process upload: ' + err.message, 'error');
           }
         }}
       />

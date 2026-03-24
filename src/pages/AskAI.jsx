@@ -64,6 +64,7 @@ export default function AskAI() {
   const [summaryMeta, setSummaryMeta] = useState({ page_count: 0, word_count: 0, cached: false })
   const [summaryStep, setSummaryStep] = useState(0)
   const [copied, setCopied] = useState(false)
+  const [summaryMinimized, setSummaryMinimized] = useState(false)
 
   // ── Chat state ──
   const [input, setInput]             = useState('')
@@ -95,6 +96,7 @@ export default function AskAI() {
     setSummaryError('')
     setSummaryStep(0)
     setCopied(false)
+    setSummaryMinimized(false)
   }, [])
 
   const loadSummaryResult = useCallback((data, cached = false) => {
@@ -285,6 +287,18 @@ export default function AskAI() {
     clearSummaryState()
   }
 
+  const handlePreviewSelectedDoc = useCallback(() => {
+    if (!activeDoc?.filename) return
+    window.dispatchEvent(
+      new CustomEvent('mutant:preview-document', {
+        detail: {
+          id: activeDoc?.id,
+          filename: activeDoc.filename,
+        },
+      }),
+    )
+  }, [activeDoc])
+
   const handleSelectDocument = useCallback((doc) => {
     if (!doc) {
       setActiveDoc(null)
@@ -393,9 +407,14 @@ export default function AskAI() {
             {activeDoc && (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-xl">
                 <span className="material-symbols-outlined text-[14px] text-blue-600">description</span>
-                <span className="text-[11px] font-semibold text-blue-700 max-w-[160px] truncate" title={activeDoc.filename}>
+                <button
+                  type="button"
+                  onClick={handlePreviewSelectedDoc}
+                  className="text-[11px] font-semibold text-blue-700 max-w-[160px] truncate hover:underline"
+                  title={`Preview ${activeDoc.filename}`}
+                >
                   {activeDoc.filename}
-                </span>
+                </button>
                 <button onClick={handleClearSelectedDoc} className="ml-1 text-blue-400 hover:text-blue-600">
                   <span className="material-symbols-outlined text-[13px]">close</span>
                 </button>
@@ -610,11 +629,11 @@ export default function AskAI() {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto scrollbar-thin px-8 py-8 space-y-6">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:p-5">
+            <div className="rounded-2xl border border-surface-high bg-surface-container-lowest p-4 lg:p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-[12px] font-bold tracking-wide text-slate-700">Document Summary in Ask AI</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
+                  <p className="text-[12px] font-bold tracking-wide text-primary">Document Summary in Ask AI</p>
+                  <p className="text-[11px] text-on-surface-variant mt-0.5">
                     {activeDoc?.filename ? `Selected: ${activeDoc.filename}` : 'Select a document from the right panel'}
                   </p>
                 </div>
@@ -622,14 +641,14 @@ export default function AskAI() {
                   <button
                     onClick={() => handleGenerateSummary(false)}
                     disabled={summaryLoading || !activeDoc?.filename}
-                    className="px-3 py-2 rounded-lg bg-blue-600 text-white text-[12px] font-semibold hover:bg-blue-700 disabled:opacity-50"
+                    className="px-3 py-2 rounded-lg bg-primary text-white text-[12px] font-semibold hover:brightness-110 disabled:opacity-50"
                   >
                     {summaryLoading ? 'Generating...' : 'Generate Summary'}
                   </button>
                   <button
                     onClick={() => handleGenerateSummary(true)}
                     disabled={summaryLoading || !activeDoc?.filename}
-                    className="px-3 py-2 rounded-lg border border-slate-300 text-[12px] font-semibold text-slate-700 hover:bg-white disabled:opacity-50"
+                    className="px-3 py-2 rounded-lg border border-outline-variant text-[12px] font-semibold text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50"
                     title="Force regenerate summary"
                   >
                     Refresh
@@ -637,7 +656,7 @@ export default function AskAI() {
                   {hasSummary && !summaryLoading && (
                     <button
                       onClick={handleCopySummary}
-                      className="px-3 py-2 rounded-lg border border-slate-300 text-[12px] font-semibold text-slate-700 hover:bg-white"
+                      className="px-3 py-2 rounded-lg border border-outline-variant text-[12px] font-semibold text-on-surface-variant hover:bg-surface-container-low"
                     >
                       {copied ? 'Copied' : 'Copy'}
                     </button>
@@ -645,95 +664,112 @@ export default function AskAI() {
                 </div>
               </div>
 
-              {summaryLoading && (
-                <div className="mt-3 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
-                    <p className="text-[12px] text-slate-600">{STEPS[summaryStep]}</p>
-                  </div>
-                  <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                    <div
-                      className="bg-blue-600 h-full rounded-full transition-all duration-700"
-                      style={{ width: `${((summaryStep + 1) / STEPS.length) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {summaryError && (
-                <p className="mt-3 text-[12px] text-red-600">{summaryError}</p>
-              )}
-
-              {!summaryLoading && !hasSummary && !summaryError && (
-                <div className="mt-3 text-center py-4">
-                  <p className="text-[12px] text-slate-500">Generate summary to see executive insights and actions.</p>
-                </div>
-              )}
-
-              {hasSummary && !summaryLoading && (
-                <div className="mt-3 space-y-5">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[11px] font-bold tracking-[0.14em] text-blue-700 uppercase">Executive Summary</p>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                        summaryMeta.cached
-                          ? 'bg-amber-100 text-amber-700 border-amber-200'
-                          : 'bg-violet-100 text-violet-700 border-violet-200'
-                      }`}>
-                        {summaryMeta.cached ? 'Cached' : 'Fresh'}
-                      </span>
-                    </div>
-                    <p className="text-[12px] text-slate-700 leading-relaxed whitespace-pre-wrap">{summaryText}</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <p className="text-[11px] font-bold tracking-[0.14em] text-blue-700 uppercase">Key Insights</p>
-                      <div className="space-y-2">
-                        {summaryFindings.length
-                          ? summaryFindings.map((item, idx) => (
-                              <div
-                                key={idx}
-                                className={`flex items-start gap-2 p-2.5 rounded-xl border ${findingBg[item.type] || findingBg.neutral}`}
-                              >
-                                <div className={`w-2 h-2 rounded-full ${findingColors[item.type] || findingColors.neutral} mt-1.5 flex-shrink-0`} />
-                                <p className={`text-[12px] leading-relaxed ${findingFg[item.type] || findingFg.neutral}`}>
-                                  {item.text || String(item)}
-                                </p>
-                              </div>
-                            ))
-                          : <p className="text-[12px] text-slate-500">No structured findings were returned.</p>
-                        }
+              {!summaryMinimized && (
+                <>
+                  {summaryLoading && (
+                    <div className="mt-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                        <p className="text-[12px] text-on-surface-variant">{STEPS[summaryStep]}</p>
                       </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <p className="text-[11px] font-bold tracking-[0.14em] text-emerald-700 uppercase">Summary Metrics</p>
-                      <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
-                        <MetricRow label="Pages" value={summaryMeta.page_count} />
-                        <MetricRow label="Word Count" value={summaryMeta.word_count.toLocaleString()} />
-                        <MetricRow label="Findings" value={summaryFindings.length} />
-                        <MetricRow label="Document" value={activeDoc?.filename || '—'} truncate />
-                      </div>
-                    </div>
-                  </div>
-
-                  {!!recommendedActions.length && (
-                    <div className="space-y-2">
-                      <p className="text-[11px] font-bold tracking-[0.14em] text-fuchsia-700 uppercase">Recommended Actions</p>
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
-                        {recommendedActions.map((action, idx) => (
-                          <div key={`${action.title}-${idx}`} className={`p-3 rounded-xl border ${findingBg[action.type] || findingBg.neutral}`}>
-                            <p className={`text-[10px] font-bold ${action.priorityColor}`}>PRIORITY: {action.priority}</p>
-                            <p className="text-[12px] font-semibold text-slate-800 mt-1">{action.title}</p>
-                            <p className="text-[11px] text-slate-600 mt-1.5 leading-relaxed">{action.text}</p>
-                          </div>
-                        ))}
+                      <div className="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+                        <div
+                          className="bg-primary h-full rounded-full transition-all duration-700"
+                          style={{ width: `${((summaryStep + 1) / STEPS.length) * 100}%` }}
+                        />
                       </div>
                     </div>
                   )}
-                </div>
+
+                  {summaryError && (
+                    <p className="mt-3 text-[12px] text-red-600">{summaryError}</p>
+                  )}
+
+                  {!summaryLoading && !hasSummary && !summaryError && (
+                    <div className="mt-3 text-center py-4">
+                      <p className="text-[12px] text-on-surface-variant">Generate summary to see executive insights and actions.</p>
+                    </div>
+                  )}
+
+                  {hasSummary && !summaryLoading && (
+                    <div className="mt-3 space-y-5">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">Executive Summary</p>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                            summaryMeta.cached
+                              ? 'bg-amber-100 text-amber-700 border-amber-200'
+                              : 'bg-violet-100 text-violet-700 border-violet-200'
+                          }`}>
+                            {summaryMeta.cached ? 'Cached' : 'Fresh'}
+                          </span>
+                        </div>
+                        <p className="text-[12px] text-on-surface leading-relaxed whitespace-pre-wrap">{summaryText}</p>
+                      </div>
+
+                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <p className="text-[11px] font-bold tracking-[0.14em] text-primary uppercase">Key Insights</p>
+                          <div className="space-y-2">
+                            {summaryFindings.length
+                              ? summaryFindings.map((item, idx) => (
+                                  <div
+                                    key={idx}
+                                    className={`flex items-start gap-2 p-2.5 rounded-xl border ${findingBg[item.type] || findingBg.neutral}`}
+                                  >
+                                    <div className={`w-2 h-2 rounded-full ${findingColors[item.type] || findingColors.neutral} mt-1.5 flex-shrink-0`} />
+                                    <p className={`text-[12px] leading-relaxed ${findingFg[item.type] || findingFg.neutral}`}>
+                                      {item.text || String(item)}
+                                    </p>
+                                  </div>
+                                ))
+                              : <p className="text-[12px] text-on-surface-variant">No structured findings were returned.</p>
+                            }
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <p className="text-[11px] font-bold tracking-[0.14em] text-emerald-700 uppercase">Summary Metrics</p>
+                          <div className="rounded-xl border border-surface-high bg-surface p-3 space-y-2">
+                            <MetricRow label="Pages" value={summaryMeta.page_count} />
+                            <MetricRow label="Word Count" value={summaryMeta.word_count.toLocaleString()} />
+                            <MetricRow label="Findings" value={summaryFindings.length} />
+                            <MetricRow label="Document" value={activeDoc?.filename || '—'} truncate />
+                          </div>
+                        </div>
+                      </div>
+
+                      {!!recommendedActions.length && (
+                        <div className="space-y-2">
+                          <p className="text-[11px] font-bold tracking-[0.14em] text-fuchsia-700 uppercase">Recommended Actions</p>
+                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
+                            {recommendedActions.map((action, idx) => (
+                              <div key={`${action.title}-${idx}`} className={`p-3 rounded-xl border ${findingBg[action.type] || findingBg.neutral}`}>
+                                <p className={`text-[10px] font-bold ${action.priorityColor}`}>PRIORITY: {action.priority}</p>
+                                <p className="text-[12px] font-semibold text-slate-800 mt-1">{action.title}</p>
+                                <p className="text-[11px] text-slate-600 mt-1.5 leading-relaxed">{action.text}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
+
+              <div className="mt-4 pt-3 border-t border-surface-high flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setSummaryMinimized((prev) => !prev)}
+                  className="w-8 h-8 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low transition-colors flex items-center justify-center"
+                  title={summaryMinimized ? 'Expand summary' : 'Minimize summary'}
+                >
+                  <span className="material-symbols-outlined text-[18px]">
+                    {summaryMinimized ? 'expand_more' : 'expand_less'}
+                  </span>
+                </button>
+              </div>
             </div>
 
             {messages.length === 0 && !loading && (
