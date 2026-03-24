@@ -51,6 +51,23 @@ const DashboardSidebar = () => {
           <span>Ask AI</span>
         </Link>
 
+        {/* User Documents - User Only */}
+        {!isAdmin && (
+          <Link
+            to="/user-documents"
+            className={`flex items-center gap-3 px-4 py-3 font-manrope text-sm font-medium tracking-tight rounded-xl transition-all duration-300 ${
+              isActive('/user-documents')
+                ? 'text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-900/30 border-l-4 border-indigo-600'
+                : 'text-slate-500 dark:text-slate-400 hover:text-indigo-500 hover:bg-indigo-50/30 scale-95 active:scale-90'
+            }`}
+          >
+            <span className="material-symbols-outlined" style={isActive('/user-documents') ? { fontVariationSettings: "'FILL' 1" } : {}}>
+              folder
+            </span>
+            <span>Documents</span>
+          </Link>
+        )}
+
         {/* Documents */}
         <Link
           to="/summarization"

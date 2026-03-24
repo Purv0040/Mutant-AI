@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from bson import ObjectId
 
@@ -9,17 +9,15 @@ from services.access import normalize_department
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+def _resolve_current_user(token: str):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    if credentials is None:
+    if not token:
         raise credentials_exception
-
-    token = credentials.credentials
 
     try:
         payload = decode_token(token)
@@ -37,10 +35,10 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_
     except Exception as e:
         print(f"Database error: {e}")
         user = None
-    
+
     if not user:
         raise credentials_exception
-    
+
     return {
         "user_id": str(user["_id"]),
         "email": user["email"],
@@ -48,3 +46,16 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_
         "role": str(user.get("role") or "user").lower(),
         "department": normalize_department(user.get("department")),
     }
+
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+    token = credentials.credentials if credentials else None
+    return _resolve_current_user(token)
+
+
+def get_current_user_for_preview(
+    token: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+):
+    token_value = credentials.credentials if credentials else token
+    return _resolve_current_user(token_value)

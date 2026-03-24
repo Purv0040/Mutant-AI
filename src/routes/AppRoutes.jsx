@@ -17,6 +17,7 @@ import MeetingsPage from '../pages/MeetingsPage';
 import SettingsPage from '../pages/SettingsPage';
 import AnalyticsPage from '../pages/AnalyticsPage';
 import TeamPage from '../pages/TeamPage';
+import UserDocumentsPage from '../pages/UserDocumentsPage';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
 import AskAI from '../pages/AskAI';
@@ -30,6 +31,13 @@ const AdminRoute = ({ children }) => {
   const { user, isAdmin } = useAuth();
   if (!user) return <Navigate to="/role-selection" />;
   if (!isAdmin) return <Navigate to="/dashboard" />;
+  return children;
+};
+
+const UserRoute = ({ children }) => {
+  const { user, isAdmin } = useAuth();
+  if (!user) return <Navigate to="/role-selection" />;
+  if (isAdmin) return <Navigate to="/documents" />;
   return children;
 };
 
@@ -50,6 +58,14 @@ const AppRoutes = () => {
       </Route>
       <Route element={<DashboardLayout />}>
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route
+          path="/user-documents"
+          element={
+            <UserRoute>
+              <UserDocumentsPage />
+            </UserRoute>
+          }
+        />
         <Route
           path="/chat"
           element={
