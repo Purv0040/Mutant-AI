@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from auth.dependencies import get_current_user
 from database import get_db
 from services.access import build_document_visibility_query
+from services.embedder import fetch_document_chunks
 from services.llm import get_smart_llm
 from services.parser import parse_file
 
@@ -159,10 +160,15 @@ def summarize_document(
         # --- Resolve actual file path ---
         try:
             file_path = _resolve_file_path(doc)
+            chunks = parse_file(file_path, doc["filename"])
         except FileNotFoundError as e:
-            raise HTTPException(status_code=404, detail=str(e))
+            # Fallback: if the document is already indexed in Pinecone,
+            # generate a summary from stored chunks even when local file is missing.
+            owner_user_id = str(doc.get("user_id", ""))
+            chunks = fetch_document_chunks(owner_user_id, doc["filename"], max_chunks=600)
+            if not chunks:
+                raise HTTPException(status_code=404, detail=str(e))
 
-        chunks = parse_file(file_path, doc["filename"])
         if not chunks:
             raise HTTPException(status_code=400, detail="No readable text found in document")
 
@@ -230,8 +236,7 @@ def summarize_document(
         raise
     except Exception as e:
         print(f"Summarize error: {e}")
-        # Return a graceful 200 OK payload containing the error to prevent browser console 500 spam
-        return {"error": True, "detail": str(e)}
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.get("/summarize/export")

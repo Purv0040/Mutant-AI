@@ -153,6 +153,9 @@ export default function Summarization() {
     startStepTicker()
     try {
       const data = await summarizeDoc(selectedFilename, force)
+      if (!data || data.error || !data.summary) {
+        throw new Error(data?.detail || 'Summary generation failed. Please try again.')
+      }
       loadResult(data, data.cached ?? false)
       // update local cache in documents list
       setDocuments(prev => prev.map(d =>

@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import TopBar from '../components/TopBar'
 import ChatMessage from '../components/ChatMessage'
 import DocumentPanel from '../components/DocumentPanel'
-import { askQuestion, upsertChatSession, getChatSessions, deleteChatSession } from '../api'
+import { askQuestion, exportSummary, summarizeDoc, upsertChatSession, getChatSessions, deleteChatSession } from '../api'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function makeSessionId() {
@@ -27,6 +27,27 @@ function timeAgo(iso) {
   return `${Math.floor(h / 24)}d ago`
 }
 
+const findingColors = {
+  positive: 'bg-emerald-500',
+  neutral:  'bg-blue-500',
+  warning:  'bg-amber-500',
+  risk:     'bg-red-500',
+}
+const findingBg = {
+  positive: 'bg-emerald-50 border-emerald-200/60',
+  neutral:  'bg-blue-50   border-blue-200/60',
+  warning:  'bg-amber-50  border-amber-200/60',
+  risk:     'bg-red-50    border-red-200/60',
+}
+const findingFg = {
+  positive: 'text-emerald-700',
+  neutral:  'text-blue-700',
+  warning:  'text-amber-700',
+  risk:     'text-red-700',
+}
+
+const STEPS = ['Reading document…', 'Analyzing content…', 'Generating summary…', 'Building insights…']
+
 // ── Component ────────────────────────────────────────────────────────────────
 export default function AskAI() {
   // ── Session state ──
@@ -36,6 +57,13 @@ export default function AskAI() {
   const [activeDoc, setActiveDoc]     = useState(null)
   const [lastAiMsgId, setLastAiMsgId] = useState(null)
   const [sessionsLoading, setSessionsLoading] = useState(true)
+  const [summaryLoading, setSummaryLoading] = useState(false)
+  const [summaryError, setSummaryError] = useState('')
+  const [summaryText, setSummaryText] = useState('')
+  const [summaryFindings, setSummaryFindings] = useState([])
+  const [summaryMeta, setSummaryMeta] = useState({ page_count: 0, word_count: 0, cached: false })
+  const [summaryStep, setSummaryStep] = useState(0)
+  const [copied, setCopied] = useState(false)
 
   // ── Chat state ──
   const [input, setInput]             = useState('')
@@ -43,6 +71,7 @@ export default function AskAI() {
   const [error, setError]             = useState('')
   const messagesEndRef                = useRef(null)
   const currentActionIdRef            = useRef(0)
+  const summaryStepTimerRef           = useRef(null)
   // ← Refs so the persist effect always sees the CURRENT sessionId / title
   //   even though it only runs when `messages` changes.
   const sessionIdRef                  = useRef(sessionId)
@@ -59,10 +88,49 @@ export default function AskAI() {
   const historyRef                    = useRef(null)
   const attachMenuRef                 = useRef(null)
 
+  const clearSummaryState = useCallback(() => {
+    setSummaryText('')
+    setSummaryFindings([])
+    setSummaryMeta({ page_count: 0, word_count: 0, cached: false })
+    setSummaryError('')
+    setSummaryStep(0)
+    setCopied(false)
+  }, [])
+
+  const loadSummaryResult = useCallback((data, cached = false) => {
+    setSummaryText(data.summary || '')
+    setSummaryFindings(data.findings || [])
+    setSummaryMeta({
+      page_count: data.page_count || 0,
+      word_count: data.word_count || 0,
+      cached,
+    })
+  }, [])
+
+  const startSummaryStepTicker = useCallback(() => {
+    setSummaryStep(0)
+    let s = 0
+    summaryStepTimerRef.current = setInterval(() => {
+      s = Math.min(s + 1, STEPS.length - 1)
+      setSummaryStep(s)
+    }, 2200)
+  }, [])
+
+  const stopSummaryStepTicker = useCallback(() => {
+    if (summaryStepTimerRef.current) {
+      clearInterval(summaryStepTimerRef.current)
+      summaryStepTimerRef.current = null
+    }
+  }, [])
+
   // ── Auto-scroll ──
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
+
+  useEffect(() => {
+    return () => stopSummaryStepTicker()
+  }, [stopSummaryStepTicker])
 
   // ── Load sessions from DB on mount ──
   useEffect(() => {
@@ -74,7 +142,9 @@ export default function AskAI() {
           id:        s.session_id,
           title:     s.title,
           messages:  s.messages || [],
-          activeDoc: s.active_doc || null,
+          activeDoc: s.active_doc
+            ? (typeof s.active_doc === 'string' ? { filename: s.active_doc } : s.active_doc)
+            : null,
           updatedAt: s.updated_at,
           createdAt: s.created_at,
         }))
@@ -109,12 +179,12 @@ export default function AskAI() {
         session_id: currId,
         title:      activeTitleRef.current,
         messages,
-        active_doc: activeDoc,
+        active_doc: activeDoc?.filename || null,
       }).catch((err) => console.warn('[Chat] DB save failed:', err))
     }, 600)
 
     return () => clearTimeout(timer)
-  }, [messages]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [messages, activeDoc]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Close menus on outside click ──
   useEffect(() => {
@@ -146,7 +216,10 @@ export default function AskAI() {
     setLoading(true)
     setError('')
     try {
-      const data = await askQuestion(question)
+      const scopedQuestion = activeDoc?.filename
+        ? `About document "${activeDoc.filename}": ${question}`
+        : question
+      const data = await askQuestion(scopedQuestion)
       if (currentActionIdRef.current !== actionId) return // Abort if user edited or started new chat
 
       const rawSources = data.source_details
@@ -167,7 +240,7 @@ export default function AskAI() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [activeDoc])
 
   const handleSend = () => sendMessage(input)
 
@@ -190,6 +263,7 @@ export default function AskAI() {
     setInput('')
     setError('')
     setActiveDoc(null)
+    clearSummaryState()
     setMenuOpen(false)
     setHistoryOpen(false)
   }
@@ -201,8 +275,72 @@ export default function AskAI() {
     setActiveDoc(sess.activeDoc || null)
     setInput('')
     setError('')
+    clearSummaryState()
     setHistoryOpen(false)
     setMenuOpen(false)
+  }
+
+  const handleClearSelectedDoc = () => {
+    setActiveDoc(null)
+    clearSummaryState()
+  }
+
+  const handleSelectDocument = useCallback((doc) => {
+    if (!doc) {
+      setActiveDoc(null)
+      clearSummaryState()
+      return
+    }
+
+    setActiveDoc({ filename: doc.filename, id: doc.id, summary: doc.summary })
+    clearSummaryState()
+
+    if (doc.summary) {
+      try {
+        const cached = JSON.parse(doc.summary)
+        if (cached?.summary) {
+          loadSummaryResult(cached, true)
+        }
+      } catch {
+        // ignore malformed cached summary
+      }
+    }
+  }, [clearSummaryState, loadSummaryResult])
+
+  const handleGenerateSummary = useCallback(async (force = false) => {
+    if (!activeDoc?.filename) {
+      setSummaryError('Select a document first from the right panel.')
+      return
+    }
+
+    setSummaryLoading(true)
+    setSummaryError('')
+    startSummaryStepTicker()
+    try {
+      const data = await summarizeDoc(activeDoc.filename, force)
+      if (!data || data.error || !data.summary) {
+        throw new Error(data?.detail || 'Summary generation failed. Please try again.')
+      }
+      loadSummaryResult(data, !!data.cached)
+    } catch (err) {
+      setSummaryError(err.message)
+    } finally {
+      stopSummaryStepTicker()
+      setSummaryLoading(false)
+    }
+  }, [activeDoc, loadSummaryResult, startSummaryStepTicker, stopSummaryStepTicker])
+
+  const handleCopySummary = () => {
+    if (!summaryText) return
+    navigator.clipboard.writeText(summaryText).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  const handleExportSummary = () => {
+    if (!activeDoc?.filename || !summaryText) return
+    exportSummary(activeDoc.filename)
   }
 
   // ── Delete a session ──
@@ -228,7 +366,23 @@ export default function AskAI() {
         'What are the key findings across all documents?',
       ]
 
-  const currentSession = sessions.find((s) => s.id === sessionId)
+  const hasSummary = !!summaryText
+  const recommendedActions = useMemo(() => {
+    if (summaryFindings.length >= 3) {
+      return summaryFindings.slice(0, 3).map((f, idx) => ({
+        priority: idx === 0 ? 'HIGH' : idx === 1 ? 'MED' : 'LOW',
+        priorityColor: idx === 0 ? 'text-red-500' : idx === 1 ? 'text-amber-500' : 'text-emerald-600',
+        title: `Finding ${idx + 1}`,
+        text: f.text || String(f),
+        type: f.type || 'neutral',
+      }))
+    }
+    return [
+      { priority: 'HIGH', priorityColor: 'text-red-500',     title: 'Review Key Risks',       text: 'Validate the highest-impact risks surfaced in this document.',                type: 'risk' },
+      { priority: 'MED',  priorityColor: 'text-amber-500',   title: 'Align Team Actions',     text: 'Convert insights into owner-based actions and timelines.',                    type: 'warning' },
+      { priority: 'LOW',  priorityColor: 'text-emerald-600', title: 'Share Executive Brief',  text: 'Share a concise summary with stakeholders for faster decisions.',             type: 'positive' },
+    ]
+  }, [summaryFindings])
 
   return (
     <div className="absolute inset-0 flex flex-col overflow-hidden bg-white">
@@ -242,10 +396,18 @@ export default function AskAI() {
                 <span className="text-[11px] font-semibold text-blue-700 max-w-[160px] truncate" title={activeDoc.filename}>
                   {activeDoc.filename}
                 </span>
-                <button onClick={() => setActiveDoc(null)} className="ml-1 text-blue-400 hover:text-blue-600">
+                <button onClick={handleClearSelectedDoc} className="ml-1 text-blue-400 hover:text-blue-600">
                   <span className="material-symbols-outlined text-[13px]">close</span>
                 </button>
               </div>
+            )}
+            {hasSummary && (
+              <button
+                onClick={handleExportSummary}
+                className="px-3 py-1.5 border border-gray-300 text-[12px] font-semibold text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Export Summary
+              </button>
             )}
             <span className="text-[11px] text-gray-500 font-medium">Synced with Botpress v1.0</span>
           </div>
@@ -448,6 +610,132 @@ export default function AskAI() {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto scrollbar-thin px-8 py-8 space-y-6">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[12px] font-bold tracking-wide text-slate-700">Document Summary in Ask AI</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {activeDoc?.filename ? `Selected: ${activeDoc.filename}` : 'Select a document from the right panel'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleGenerateSummary(false)}
+                    disabled={summaryLoading || !activeDoc?.filename}
+                    className="px-3 py-2 rounded-lg bg-blue-600 text-white text-[12px] font-semibold hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {summaryLoading ? 'Generating...' : 'Generate Summary'}
+                  </button>
+                  <button
+                    onClick={() => handleGenerateSummary(true)}
+                    disabled={summaryLoading || !activeDoc?.filename}
+                    className="px-3 py-2 rounded-lg border border-slate-300 text-[12px] font-semibold text-slate-700 hover:bg-white disabled:opacity-50"
+                    title="Force regenerate summary"
+                  >
+                    Refresh
+                  </button>
+                  {hasSummary && !summaryLoading && (
+                    <button
+                      onClick={handleCopySummary}
+                      className="px-3 py-2 rounded-lg border border-slate-300 text-[12px] font-semibold text-slate-700 hover:bg-white"
+                    >
+                      {copied ? 'Copied' : 'Copy'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {summaryLoading && (
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
+                    <p className="text-[12px] text-slate-600">{STEPS[summaryStep]}</p>
+                  </div>
+                  <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className="bg-blue-600 h-full rounded-full transition-all duration-700"
+                      style={{ width: `${((summaryStep + 1) / STEPS.length) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {summaryError && (
+                <p className="mt-3 text-[12px] text-red-600">{summaryError}</p>
+              )}
+
+              {!summaryLoading && !hasSummary && !summaryError && (
+                <div className="mt-3 text-center py-4">
+                  <p className="text-[12px] text-slate-500">Generate summary to see executive insights and actions.</p>
+                </div>
+              )}
+
+              {hasSummary && !summaryLoading && (
+                <div className="mt-3 space-y-5">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] font-bold tracking-[0.14em] text-blue-700 uppercase">Executive Summary</p>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                        summaryMeta.cached
+                          ? 'bg-amber-100 text-amber-700 border-amber-200'
+                          : 'bg-violet-100 text-violet-700 border-violet-200'
+                      }`}>
+                        {summaryMeta.cached ? 'Cached' : 'Fresh'}
+                      </span>
+                    </div>
+                    <p className="text-[12px] text-slate-700 leading-relaxed whitespace-pre-wrap">{summaryText}</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-bold tracking-[0.14em] text-blue-700 uppercase">Key Insights</p>
+                      <div className="space-y-2">
+                        {summaryFindings.length
+                          ? summaryFindings.map((item, idx) => (
+                              <div
+                                key={idx}
+                                className={`flex items-start gap-2 p-2.5 rounded-xl border ${findingBg[item.type] || findingBg.neutral}`}
+                              >
+                                <div className={`w-2 h-2 rounded-full ${findingColors[item.type] || findingColors.neutral} mt-1.5 flex-shrink-0`} />
+                                <p className={`text-[12px] leading-relaxed ${findingFg[item.type] || findingFg.neutral}`}>
+                                  {item.text || String(item)}
+                                </p>
+                              </div>
+                            ))
+                          : <p className="text-[12px] text-slate-500">No structured findings were returned.</p>
+                        }
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-bold tracking-[0.14em] text-emerald-700 uppercase">Summary Metrics</p>
+                      <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
+                        <MetricRow label="Pages" value={summaryMeta.page_count} />
+                        <MetricRow label="Word Count" value={summaryMeta.word_count.toLocaleString()} />
+                        <MetricRow label="Findings" value={summaryFindings.length} />
+                        <MetricRow label="Document" value={activeDoc?.filename || '—'} truncate />
+                      </div>
+                    </div>
+                  </div>
+
+                  {!!recommendedActions.length && (
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-bold tracking-[0.14em] text-fuchsia-700 uppercase">Recommended Actions</p>
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
+                        {recommendedActions.map((action, idx) => (
+                          <div key={`${action.title}-${idx}`} className={`p-3 rounded-xl border ${findingBg[action.type] || findingBg.neutral}`}>
+                            <p className={`text-[10px] font-bold ${action.priorityColor}`}>PRIORITY: {action.priority}</p>
+                            <p className="text-[12px] font-semibold text-slate-800 mt-1">{action.title}</p>
+                            <p className="text-[11px] text-slate-600 mt-1.5 leading-relaxed">{action.text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {messages.length === 0 && !loading && (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center max-w-md px-6">
@@ -573,7 +861,10 @@ export default function AskAI() {
         </div>
 
         {/* Right: Document panel */}
-        <DocumentPanel />
+        <DocumentPanel
+          onSelectDocument={handleSelectDocument}
+          selectedFilename={activeDoc?.filename || ''}
+        />
       </div>
 
       <style>{`
@@ -590,6 +881,17 @@ export default function AskAI() {
           to   { transform: translateY(0);   opacity: 1; }
         }
       `}</style>
+    </div>
+  )
+}
+
+function MetricRow({ label, value, truncate }) {
+  return (
+    <div className="flex items-center justify-between gap-2 text-[12px]">
+      <span className="text-slate-500">{label}</span>
+      <span className={`font-semibold text-slate-800 text-right ${truncate ? 'truncate max-w-[160px]' : ''}`}>
+        {value}
+      </span>
     </div>
   )
 }

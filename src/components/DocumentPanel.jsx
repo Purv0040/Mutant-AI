@@ -180,7 +180,7 @@ function PreviewModal({ file, onClose }) {
 }
 
 // ── DocumentPanel ──────────────────────────────────────────────────────────────
-export default function DocumentPanel({ onUploaded }) {
+export default function DocumentPanel({ onUploaded, onSelectDocument, selectedFilename }) {
   const { isAdmin, user } = useAuth()
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -325,16 +325,27 @@ export default function DocumentPanel({ onUploaded }) {
           {!loading && files.map((file) => {
             const type = extensionType(file.filename)
             const style = typeStyle[type] || typeStyle.PDF
+            const isSelected = selectedFilename === file.filename
             return (
               <div
                 key={file.id}
-                onClick={() => setPreviewFile(file)}
-                className="flex items-start gap-2.5 px-2 py-2.5 rounded-btn hover:bg-surface-container transition-all cursor-pointer group"
-                title={`Click to preview ${file.filename}`}
+                onClick={() => {
+                  if (onSelectDocument) {
+                    onSelectDocument(file)
+                    return
+                  }
+                  setPreviewFile(file)
+                }}
+                className={`flex items-start gap-2.5 px-2 py-2.5 rounded-btn transition-all cursor-pointer group ${
+                  isSelected
+                    ? 'bg-blue-50 ring-1 ring-blue-200'
+                    : 'hover:bg-surface-container'
+                }`}
+                title={onSelectDocument ? `Click to select ${file.filename}` : `Click to preview ${file.filename}`}
               >
                 <span className="text-lg mt-0.5">{style.icon}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-medium text-on-surface truncate group-hover:text-primary">
+                  <p className={`text-[12px] font-medium text-on-surface truncate ${isSelected ? 'text-blue-700' : 'group-hover:text-primary'}`}>
                     {file.filename}
                   </p>
                   <div className="flex items-center gap-1.5 mt-0.5">
@@ -350,9 +361,22 @@ export default function DocumentPanel({ onUploaded }) {
                   </div>
                   {/* Preview hint */}
                   <p className="text-[9px] text-primary opacity-0 group-hover:opacity-100 transition-opacity mt-0.5 font-medium">
-                    Click to preview
+                    {onSelectDocument ? 'Click to select' : 'Click to preview'}
                   </p>
                 </div>
+                {onSelectDocument && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setPreviewFile(file)
+                    }}
+                    className="text-[10px] px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    title="Preview"
+                  >
+                    View
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={(e) => {

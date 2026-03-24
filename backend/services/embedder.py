@@ -117,3 +117,40 @@ def delete_document_vectors(user_id, filename):
     except Exception as e:
         print(f"Error deleting vectors: {e}")
         return False
+
+
+def fetch_document_chunks(user_id, filename, max_chunks=500):
+    """
+    Fetch stored chunks for a single document from Pinecone.
+    This is useful when the original uploaded file is no longer available on disk.
+    """
+    try:
+        dummy_vec = [0.0] * 1024  # bge-large-en-v1.5 embedding dimension
+        results = index.query(
+            vector=dummy_vec,
+            top_k=max_chunks,
+            filter={
+                "user_id": str(user_id),
+                "filename": filename,
+            },
+            include_metadata=True,
+        )
+        matches = results.get("matches", []) or []
+
+        chunks = []
+        for match in matches:
+            meta = match.get("metadata", {}) or {}
+            text = (meta.get("text") or "").strip()
+            if not text:
+                continue
+            try:
+                idx = int(meta.get("chunk_index", 0))
+            except (TypeError, ValueError):
+                idx = 0
+            chunks.append({"text": text, "chunk_index": idx})
+
+        chunks.sort(key=lambda c: c.get("chunk_index", 0))
+        return chunks
+    except Exception as e:
+        print(f"Error fetching document chunks from Pinecone: {e}")
+        return []
