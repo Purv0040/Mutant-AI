@@ -8,7 +8,7 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 
-from auth.dependencies import get_current_user
+from auth.dependencies import get_current_user, get_current_user_for_preview
 from database import get_db
 from services.botpress import delete_file_from_botpress, upload_file_to_botpress
 from services.access import build_document_visibility_query, normalize_access_mode, to_object_id
@@ -204,10 +204,9 @@ def get_document_chunk_counts(current_user: dict = Depends(get_current_user)):
 @router.get("/documents/{doc_id}/preview")
 def preview_document(
     doc_id: str,
-    token: str = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_for_preview),
 ):
-    """Stream the original file so the browser can preview it (token accepted via query param for iframe use)."""
+    """Stream the original file so the browser can preview it."""
     try:
         db = get_db()
         try:
