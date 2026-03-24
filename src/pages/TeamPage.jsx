@@ -28,6 +28,8 @@ const TeamPage = () => {
   const [uploadRequests, setUploadRequests] = useState([]);
   const [detailedDepartment, setDetailedDepartment] = useState(null);
   const [departmentDocs, setDepartmentDocs] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const pendingRequestsCount = uploadRequests.filter(r => r.status === 'Pending').length;
 
   const loadUploadRequests = async () => {
     try {
@@ -279,10 +281,55 @@ const TeamPage = () => {
           </div>
           <div className="flex items-center gap-4">
             <div className="relative group">
-              <span className="material-symbols-outlined text-slate-500 group-hover:text-indigo-600 transition-colors cursor-pointer">
+              <span 
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="material-symbols-outlined text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer text-[26px]"
+              >
                 notifications
               </span>
-              <span className="absolute -top-1 -right-1 w-2 h-2 bg-error rounded-full"></span>
+              {pendingRequestsCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-error text-[9px] font-bold text-white shadow-sm ring-2 ring-white zoom-in">
+                  {pendingRequestsCount}
+                </span>
+              )}
+
+              {/* Notifications Dropdown */}
+              {showNotifications && (
+                <div className="absolute right-0 mt-3 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                  <div className="bg-slate-50 border-b border-slate-100 px-4 py-3 flex justify-between items-center">
+                    <h4 className="font-bold text-slate-800 font-headline">Notifications</h4>
+                    {pendingRequestsCount > 0 && (
+                      <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">{pendingRequestsCount} new</span>
+                    )}
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {pendingRequestsCount > 0 ? (
+                      <div 
+                        onClick={() => {
+                          setActiveTab('requests');
+                          setShowNotifications(false);
+                        }}
+                        className="p-4 hover:bg-slate-50 cursor-pointer border-b border-slate-100 transition-colors flex gap-3"
+                      >
+                        <div className="w-10 h-10 rounded-full bg-orange-50 shrink-0 flex items-center justify-center text-orange-500">
+                          <span className="material-symbols-outlined text-lg">publish</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-800">New Upload Requests</p>
+                          <p className="text-xs text-slate-500 mt-0.5">You have {pendingRequestsCount} pending document upoad {pendingRequestsCount === 1 ? 'request' : 'requests'} waiting for your approval.</p>
+                          <p className="text-xs text-indigo-600 font-bold mt-2">Review now</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-8 text-center">
+                        <span className="material-symbols-outlined text-4xl text-slate-200 mb-2">notifications_paused</span>
+                        <p className="text-sm font-medium text-slate-500">You're all caught up!</p>
+                        <p className="text-xs text-slate-400 mt-1">No pending requests or alerts.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
