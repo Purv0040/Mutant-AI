@@ -303,3 +303,10 @@ export function updateUploadRequestStatus(requestId, reqStatus) {
 }
 
 
+export function getUserStats() {
+  return request('/auth/users/stats')
+}
+
+export function listUsers() {
+  return request('/auth/users')
+}

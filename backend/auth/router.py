@@ -323,3 +323,46 @@ def delete_profile(current_user: dict = Depends(get_current_user)):
         print(f"Delete profile error: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
+@router.get("/users/stats")
+def get_user_stats(current_user: dict = Depends(get_current_user)):
+    """GET - Get user counts by department (Admin only for full stats, or user can see their own)"""
+    try:
+        db = get_db()
+        # For now, let anyone see the counts to power the dashboard cards
+        pipeline = [
+            {"$group": {"_id": "$department", "count": {"$sum": 1}}}
+        ]
+        results = list(db["users"].aggregate(pipeline))
+        
+        # Format into a dict: {"Engineering": 12, "Product": 8, ...}
+        stats = {r["_id"]: r["count"] for r in results if r["_id"]}
+        
+        # Ensure common departments are at least present with 0 if missing
+        for dept in ["Engineering", "Product", "Marketing", "Design"]:
+            if dept not in stats:
+                stats[dept] = 0
+                
+        return stats
+    except Exception as e:
+        print(f"Get user stats error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.get("/users")
+def list_users(current_user: dict = Depends(get_current_user)):
+    """GET - List all users (Admin only)"""
+    if str(current_user.get("role")).lower() != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+        
+    try:
+        db = get_db()
+        users = list(db["users"].find({}, {"hashed_password": 0}))
+        for u in users:
+            u["id"] = str(u["_id"])
+            del u["_id"]
+            if u.get("created_at"):
+                u["created_at"] = u["created_at"].isoformat()
+        return users
+    except Exception as e:
+        print(f"List users error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

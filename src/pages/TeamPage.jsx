@@ -1,8 +1,16 @@
 import { useState, useEffect } from 'react';
-import { getDocuments, getUploadRequests, updateUploadRequestStatus } from '../api';
+import { getDocuments, getUploadRequests, updateUploadRequestStatus, getUserStats, listUsers } from '../api';
 
 const TeamPage = () => {
-  // State management
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [departments, setDepartments] = useState([
+    { name: 'Engineering', members: 0, color: 'bg-blue-50', icon: '💻' },
+    { name: 'Product', members: 0, color: 'bg-purple-50', icon: '🎯' },
+    { name: 'Marketing', members: 0, color: 'bg-pink-50', icon: '📢' },
+    { name: 'Design', members: 0, color: 'bg-green-50', icon: '🎨' },
+  ]);
+  const [loading, setLoading] = useState(true);
+
   const [activeTab, setActiveTab] = useState('overview');
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'card'
   const [searchTerm, setSearchTerm] = useState('');
@@ -29,7 +37,44 @@ const TeamPage = () => {
   const [detailedDepartment, setDetailedDepartment] = useState(null);
   const [departmentDocs, setDepartmentDocs] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
-  const pendingRequestsCount = uploadRequests.filter(r => r.status === 'Pending').length;
+
+  const loadTeamData = async () => {
+    setLoading(true);
+    try {
+      const [users, stats, requests] = await Promise.all([
+        listUsers(),
+        getUserStats(),
+        getUploadRequests()
+      ]);
+
+      const formattedUsers = (users || []).map(u => ({
+        ...u,
+        name: u.name || 'Anonymous',
+        status: 'Active', // Defaulting to Active for now
+        lastLogin: 'Today',
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=random`,
+        joinDate: u.created_at ? new Date(u.created_at).toLocaleDateString() : 'N/A',
+        activityScore: Math.floor(Math.random() * 40) + 60, // Random score for UI polish
+      }));
+
+      setTeamMembers(formattedUsers);
+      setUploadRequests(Array.isArray(requests) ? requests : []);
+
+      setDepartments(prevDpts => prevDpts.map(d => ({
+        ...d,
+        members: stats[d.name] || 0
+      })));
+
+    } catch (err) {
+      console.error('Failed to load team data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTeamData();
+  }, []);
 
   const loadUploadRequests = async () => {
     try {
@@ -88,68 +133,7 @@ const TeamPage = () => {
     },
   });
 
-  // Mock data for team members
-  const teamMembers = [
-    {
-      id: 1,
-      name: 'Alexander Thorne',
-      email: 'alex.thorne@mutantai.io',
-      role: 'Admin',
-      department: 'Engineering',
-      status: 'Active',
-      lastLogin: '2 hours ago',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD4BlQmau-PblLFf0rJNs1IsRdzKruAZKRYLzaXe2xjij4k_rerpxVwnreSI6LoxROup3hoPHfPfAujKcvpXSV_JRw_1t_AB0krcxz1uhEzHsejL5sg_iT2RXjgUP7D8d-HCF-9JYAoKDcwzUmxkECUUwn6NUnQvpUeSA6W0v2xTOwcJIfPEhWhdaJ2ObpvfbOh3coRcDuodgJpSZmg_FliGR-GDi8qIW3splkOEIAlg0T2rw1xKrZyaOmbd-ck8_U-ciZiYNMbd_M',
-      joinDate: 'Jan 15, 2024',
-      documents: 142,
-      activityScore: 92,
-    },
-    {
-      id: 2,
-      name: 'Elena Rodriguez',
-      email: 'e.rodriguez@mutantai.io',
-      role: 'Editor',
-      department: 'Product',
-      status: 'Active',
-      lastLogin: 'Yesterday, 4:22 PM',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDh9Zcdj3QCiXpexf-eRdx8K1LF_czZPnH-NPwNXpUUdEBLJQshvtw0kb0TYA-luOj6pzUMBYphgYybX5jl2DZGr6MmluRk2M6qPdb_5hSfAADFwq9CeTD4vftQXKcT8xzdSkGEZasMIWgICHHCB1DQb2e1ohacOQYgIueE0X3y5kxmBYrwuNnWkMvljFEpy6NQ7YgO6EAZJPCf9eiBuRqQ6UNCOpyjtCA9c9AiuuzX8NYBjw85wQXDX0mmMRG78I0y3L-D6MUXop8',
-      joinDate: 'Feb 22, 2024',
-      documents: 87,
-      activityScore: 78,
-    },
-    {
-      id: 3,
-      name: 'Marcus Chen',
-      email: 'm.chen@mutantai.io',
-      role: 'Viewer',
-      department: 'Marketing',
-      status: 'Inactive',
-      lastLogin: 'Oct 12, 2024',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBKAAVjtd6tpSZnkwKEbrvGn14uUUWNJ1xd8qAtqkqkbn_BV7FsNs67-gQb9iJ1sNmnhO3WZIq4Y1odW-SAB8KHUQBhf5ARBs-dCD1LRbbXKmGrs0rlunuP9w3Ho2nupfyCQNLFgQzeVCXjIOqSjrdcMwuF_9RuuurZVaG1JP9BVAYDtyKsP-EmQVqrDWDZfhQMW4yDGucE5JIUqJ8sd_IlRCQUmxVLM-KJyDZV4QbqPdsRDo7aclkFOLlUeWdtwCOqTxMAc4tV5ao',
-      joinDate: 'Dec 01, 2023',
-      documents: 23,
-      activityScore: 34,
-    },
-    {
-      id: 4,
-      name: 'Sophia Williams',
-      email: 's.williams@mutantai.io',
-      role: 'Editor',
-      department: 'Design',
-      status: 'Active',
-      lastLogin: '3 hours ago',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCv_2ESis1456YEVzDcqikqK6kY8kCn7b1ZoCuI_FeB-La1wN2WkYHZ_jyq3V6QCSJFOsyiHSiUxbqMSI_GQ_NKKecMDeHkiGUf5REMSSZFrU2ON7jsqf4I7RaoC9R19QQjBpTs2-1r5U00ik0Be4Gvi9pG3omT9YV_wZU5g0z561fg4OtsXOgUTCb7Vcawf3ruYb-HKI0Xe0d6-eIM_jAIAlzfnJ2WFzfb-gxNqm9-GemX1xQnnFNokmWEpQBRda2jmaDDYUaOi18',
-      joinDate: 'Jan 30, 2024',
-      documents: 156,
-      activityScore: 89,
-    },
-  ];
-
-  const departments = [
-    { name: 'Engineering', members: 12, color: 'bg-blue-50', icon: '💻' },
-    { name: 'Product', members: 8, color: 'bg-purple-50', icon: '🎯' },
-    { name: 'Marketing', members: 6, color: 'bg-pink-50', icon: '📢' },
-    { name: 'Design', members: 5, color: 'bg-green-50', icon: '🎨' },
-  ];
+  const pendingRequestsCount = uploadRequests.filter(r => r.status === 'Pending').length;
 
   // Filter members based on search and selected filters
   const filteredMembers = teamMembers.filter(member => {

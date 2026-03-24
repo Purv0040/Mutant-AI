@@ -9,13 +9,17 @@ from dotenv import load_dotenv
 
 from database import get_db
 
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=True)
 
-# Load API keys from .env only (never hardcode keys in source code)
-_env_key = os.getenv("OPENROUTER_API_KEY", "").strip()
-OPENROUTER_API_KEYS = [k.strip() for k in _env_key.split(",") if k.strip()] if _env_key else []
-
+_ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+
+def _get_api_keys() -> list:
+    """Read API keys fresh from .env every time so key changes take effect without restart."""
+    load_dotenv(_ENV_FILE, override=True)
+    raw = os.getenv("OPENROUTER_API_KEY", "").strip()
+    return [k.strip() for k in raw.split(",") if k.strip()]
 
 # 1. Multi-model fallback configuration
 # Ordered by: free/cheap first, falling back to larger/primary if needed
@@ -80,8 +84,9 @@ def call_openrouter(
     - Exponential Backoff & Smart Retries
     - Automated Model Eviction & Fallback
     """
-    if not OPENROUTER_API_KEYS:
-        print("[LLM Warn] OPENROUTER_API_KEYS not set. Cannot use Pinecone LLM embedder.")
+    api_keys = _get_api_keys()
+    if not api_keys:
+        print("[LLM Warn] OPENROUTER_API_KEY not set in .env. Cannot call LLM.")
         return ""
     # --- 5. Daily Usage Protection ---
     if not check_daily_limit():
@@ -112,7 +117,7 @@ def call_openrouter(
     # --- 3. Request Queue System ---
     with _request_semaphore:
         # --- 0. Multi-Key Fallback Loop ---
-        for api_key in OPENROUTER_API_KEYS:
+        for api_key in api_keys:
             headers = {
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
