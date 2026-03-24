@@ -11,32 +11,20 @@ from database import get_db
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
-# Hardcoded pool of API keys if environment variable is not comma-separated
+# Load API keys from .env only (never hardcode keys in source code)
 _env_key = os.getenv("OPENROUTER_API_KEY", "").strip()
-OPENROUTER_API_KEYS = [k.strip() for k in _env_key.split(",")] if _env_key else []
+OPENROUTER_API_KEYS = [k.strip() for k in _env_key.split(",") if k.strip()] if _env_key else []
 
-# Append hardcoded alternative keys to ensure a fallback pool always exists
-_fallback_keys = [
-    "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",
-    "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",
-    "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",
-    "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",
-    "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"
-]
-for key in _fallback_keys:
-    if key not in OPENROUTER_API_KEYS:
-        OPENROUTER_API_KEYS.append(key)
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # 1. Multi-model fallback configuration
 # Ordered by: free/cheap first, falling back to larger/primary if needed
 ROBUST_MODELS = [
-    "google/gemini-2.0-flash-lite-001",
-    "meta-llama/llama-3.3-70b-instruct:free",          # Primary model
-    "liquid/lfm-2.5-1.2b-instruct:free",               # Secondary model
-    "mistralai/mistral-small-3.1-24b-instruct:free",   # Backup 1
-    "qwen/qwen3-4b:free",                              # Backup 2
-    "meta-llama/llama-3.3-70b-instruct",               # Ultimate Backup (Paid fallback if account allows)
+    "google/gemini-2.0-flash-lite-001",                # Primary (confirmed working)
+    "meta-llama/llama-3.3-70b-instruct:free",          # Free fallback 1
+    "mistralai/mistral-small-3.1-24b-instruct:free",   # Free fallback 2
+    "qwen/qwen3-4b:free",                              # Free fallback 3
+    "liquid/lfm-2.5-1.2b-instruct:free",               # Free fallback 4
 ]
 
 # 2. Rate limit & backoff config
@@ -179,11 +167,16 @@ def call_openrouter(
                                 print(f"[LLM Core] Exhausted retries for {model}, switching models.")
                                 break # Go to outer loop to switch model
                                 
-                        elif response.status_code in (401, 403, 402):
-                            # API Key burnt or empty credits
+                        elif response.status_code in (401, 403):
+                            # API Key burnt or disabled
                             last_error = f"API Key Failed {response.status_code}: {response.text[:100]}"
                             print(f"[LLM Core] API Key Exception on {api_key[:12]}... Switching to next API key.")
                             break # Break model loop, continue to next api_key loop
+                        elif response.status_code == 402:
+                            # 402 means Insufficient Credits for this specific paid model
+                            last_error = f"Insufficient Credits for {model}"
+                            print(f"[LLM Core] 402 Payment Required for {model}. Trying next free model...")
+                            break # Go to outer loop to switch model
                                 
                         else:
                             # 6. Graceful Error Handling (Other HTTP Codes)

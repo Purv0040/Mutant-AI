@@ -63,13 +63,7 @@ const DashboardPage = () => {
           </h1>
         </div>
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary-fixed shadow-sm">
-            <img
-              alt="User Avatar"
-              className="w-full h-full object-cover"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBmr_UpAGGzuUQ0Nnm8V34JSslbr5FUIcVn-GXlLdlBCnDH4yhIaGdJ9KCxO7sXYpNl9ffbFawt_ABpwyOw1e0jMEH5LFOzjBdwtuWjTsv-gJuTDcqXClBVb2vpkyOGHJgMzp5ITb6R--tJZ7v4KnSRC8ZwpORNr175CCaK_J-zL3azW1H1MdeG7iWGRBJWtvoanMGgHXJRMmEh2BUZtyqGOXHf0eYIGWctu_cTHtSmf962Ny-cvH8RKn9J64Tj88hUXtzh6lFxDXg"
-            />
-          </div>
+          {/* Avatar removed as per request */}
         </div>
       </header>
 

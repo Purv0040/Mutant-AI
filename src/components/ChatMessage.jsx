@@ -84,8 +84,16 @@ export default function ChatMessage({ role, text, sources, provider, onEdit, isN
             ? 'bg-blue-600 text-white rounded-tr-sm shadow-md'
             : 'bg-gray-100 text-gray-900 rounded-tl-sm border border-gray-200 shadow-sm'
         }`}>
-          <p className="font-medium whitespace-pre-wrap">
-            {shouldAnimate ? displayed : text}
+          <div className="font-medium whitespace-pre-wrap relative">
+            <span
+              dangerouslySetInnerHTML={{
+                __html: (shouldAnimate ? displayed : text)
+                  .replace(/▯/g, ' ') // Remove PDF missing char artifact
+                  .replace(/</g, '&lt;').replace(/>/g, '&gt;') // Sanitize HTML tags
+                  .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold">$1</strong>')
+                  .replace(/\*([^*\n]+)\*/g, '<em class="italic">$1</em>')
+              }}
+            />
             {/* blinking cursor while typing */}
             {shouldAnimate && !done && (
               <span
@@ -100,7 +108,7 @@ export default function ChatMessage({ role, text, sources, provider, onEdit, isN
                 }}
               />
             )}
-          </p>
+          </div>
         </div>
 
         {/* Actions row: Copy / Edit – visible on hover */}

@@ -17,11 +17,6 @@ const ChatPage = () => {
           <button className="p-2 rounded-full hover:bg-surface-container-high transition-colors">
             <span className="material-symbols-outlined text-on-surface-variant">settings</span>
           </button>
-          <img
-            className="w-8 h-8 rounded-full border border-surface-container-highest shadow-sm"
-            data-alt="User profile avatar smiling"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAQ1_H4s9vHoX_08-oD-syn0Z_Cr6jmv7szYtumdYjc076gux1UDmkUpKzlLOzgHUDNkJk7aWbBZoKf3PAXjvwZrEvZMq9fM53MzGq_L8P3NMzBPoQaWN3Bo12gfk5-Ahxhxr6UmJcJQt4E88oznlvJARju2_SxN942P1vzB5q0LTNs0GXy2ZpN8MiKRXSkkxPxe9x_VMuGIxd0gQ76CeFINZFE7wILf6kGljKlyFAm_aP4AQFhrMx6rRtbaB8KkQzNZ5BHcYthPe4"
-          />
         </div>
       </header>
       {/* CHAT CANVAS */}
