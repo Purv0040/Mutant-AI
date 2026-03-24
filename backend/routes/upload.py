@@ -17,7 +17,7 @@ from services.parser import parse_file
 
 router = APIRouter(tags=["documents"])
 
-ALLOWED_EXTENSIONS = {".pdf", ".docx", ".csv"}
+ALLOWED_EXTENSIONS = {".pdf", ".docx", ".csv", ".xlsx", ".pptx"}
 UPLOAD_DIR = Path(__file__).resolve().parents[1] / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -78,24 +78,18 @@ def upload_document(
             shutil.copyfileobj(file.file, buffer)
 
         chunks = parse_file(str(destination), Path(file.filename).name)
-        if not chunks:
-            if destination.exists():
-                destination.unlink(missing_ok=True)
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No readable text found in this document",
+        stored = 0
+        if chunks:
+            stored = embed_and_store(
+                chunks,
+                user_id,
+                Path(file.filename).name,
+                metadata={
+                    "access_mode": normalized_access_mode,
+                    "owner_role": owner_role,
+                    "owner_department": owner_department,
+                },
             )
-
-        stored = embed_and_store(
-            chunks,
-            user_id,
-            Path(file.filename).name,
-            metadata={
-                "access_mode": normalized_access_mode,
-                "owner_role": owner_role,
-                "owner_department": owner_department,
-            },
-        )
 
         botpress_result = {"botpress_file_id": None, "botpress_status": "not_indexed"}
         try:

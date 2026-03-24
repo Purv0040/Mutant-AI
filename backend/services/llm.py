@@ -13,13 +13,19 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 # Hardcoded pool of API keys if environment variable is not comma-separated
 _env_key = os.getenv("OPENROUTER_API_KEY", "").strip()
-OPENROUTER_API_KEYS = [k.strip() for k in _env_key.split(",")] if _env_key else [
+OPENROUTER_API_KEYS = [k.strip() for k in _env_key.split(",")] if _env_key else []
+
+# Append hardcoded alternative keys to ensure a fallback pool always exists
+_fallback_keys = [
     "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",
     "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",
     "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",
     "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",
     "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"
 ]
+for key in _fallback_keys:
+    if key not in OPENROUTER_API_KEYS:
+        OPENROUTER_API_KEYS.append(key)
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # 1. Multi-model fallback configuration

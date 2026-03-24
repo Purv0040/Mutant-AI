@@ -274,11 +274,10 @@ export function deleteChatSession(sessionId) {
 // ── Upload Requests API ───────────────────────────────────────────────────────
 
 /** User submits an upload request (saved to MongoDB) */
-export function createUploadRequest(payload) {
+export function createUploadRequest(formData) {
   return request('/upload-requests', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: formData,
   })
 }
 

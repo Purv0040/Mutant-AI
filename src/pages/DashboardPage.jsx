@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createUploadRequest, getDocuments } from '../api'
+import { createUploadRequest, getDocuments, uploadDocument } from '../api'
 import { useAuth } from '../context/AuthContext'
 import UploadRequestModal from '../components/UploadRequestModal'
 
@@ -12,20 +12,20 @@ const DashboardPage = () => {
   const [error, setError] = useState('')
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
 
-  useEffect(() => {
-    const loadDashboard = async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const docs = await getDocuments()
-        setDocuments(Array.isArray(docs) ? docs : [])
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
+  const loadDashboard = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const docs = await getDocuments()
+      setDocuments(Array.isArray(docs) ? docs : [])
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
+  }
 
+  useEffect(() => {
     loadDashboard()
   }, [])
 
@@ -190,16 +190,25 @@ const DashboardPage = () => {
         defaultAccessMode={!isAdmin ? (user?.department || 'All') : 'All'}
         onSubmit={async (data) => {
           try {
-            await createUploadRequest({
-              file_name: data.file.name,
-              file_size: data.file.size,
-              access_mode: data.accessMode,
-              department: data.accessMode,
-            });
-            setIsUploadModalOpen(false);
-            alert(`Upload request sent to Admin for the ${data.accessMode} department!`);
+            if (isAdmin) {
+              await uploadDocument(data.file, {
+                accessMode: data.accessMode,
+              });
+              setIsUploadModalOpen(false);
+              alert(`Document uploaded successfully for the ${data.accessMode} department!`);
+              loadDashboard();
+            } else {
+              const formData = new FormData();
+              formData.append('file', data.file);
+              formData.append('access_mode', data.accessMode);
+              formData.append('department', data.accessMode);
+              
+              await createUploadRequest(formData);
+              setIsUploadModalOpen(false);
+              alert(`Upload request sent to Admin for the ${data.accessMode} department!`);
+            }
           } catch (err) {
-            alert('Failed to send request: ' + err.message);
+            alert('Failed to process upload: ' + err.message);
           }
         }}
       />
