@@ -231,10 +231,13 @@ const TeamPage = () => {
     setDetailedDepartment(deptName);
     try {
       const docs = await getDocuments();
-      setDepartmentDocs(Array.isArray(docs) ? docs.filter(d => 
-        String(d.category || '').toLowerCase() === deptName.toLowerCase() || 
-        String(d.accessMode || '').toLowerCase() === deptName.toLowerCase()
-      ) : []);
+      const filtered = (Array.isArray(docs) ? docs : []).filter(d => {
+        const accessMode = String(d.access_mode || d.accessMode || '').toLowerCase();
+        const dept = deptName.toLowerCase();
+        // Show docs specifically for this department OR docs shared with 'All'
+        return accessMode === dept || accessMode === 'all';
+      });
+      setDepartmentDocs(filtered);
     } catch (err) {
       console.error(err);
       setDepartmentDocs([]);
@@ -840,21 +843,69 @@ const TeamPage = () => {
              
              {/* Show Department Documents */}
              <h3 className="text-xl font-bold mb-4 font-headline text-slate-800">Department Documents</h3>
-             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-2">
-               {departmentDocs.length === 0 ? <p className="text-slate-500 p-4 text-sm font-medium">No documents assigned to this department yet.</p> : departmentDocs.map(doc => (
-                 <div key={doc.id} className="flex justify-between items-center p-4 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors">
-                   <div className="flex items-center gap-4">
-                     <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-500">
-                       <span className="material-symbols-outlined text-lg">description</span>
-                     </div>
-                     <div>
-                       <span className="font-bold text-sm text-slate-700 block">{doc.filename || 'Unnamed Document'}</span>
-                       <span className="text-xs text-slate-400 block mt-0.5">Uploaded {new Date(doc.uploaded_at || Date.now()).toLocaleDateString()}</span>
-                     </div>
-                   </div>
-                   <span className="text-xs font-bold text-indigo-700 px-3 py-1 bg-indigo-50 rounded-full">{doc.accessMode || doc.category || detailedDepartment}</span>
+             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+               {departmentDocs.length === 0 ? (
+                 <div className="flex flex-col items-center justify-center py-12 text-center">
+                   <span className="material-symbols-outlined text-5xl text-slate-200 mb-3">folder_open</span>
+                   <p className="text-slate-500 font-medium">No documents found for {detailedDepartment}.</p>
+                   <p className="text-slate-400 text-sm mt-1">Upload documents with access mode set to &quot;{detailedDepartment}&quot;.</p>
                  </div>
-               ))}
+               ) : (
+                 <table className="w-full text-left">
+                   <thead>
+                     <tr className="bg-slate-50 border-b border-slate-200">
+                       <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Document</th>
+                       <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Uploaded</th>
+                       <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Access</th>
+                       <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Status</th>
+                     </tr>
+                   </thead>
+                   <tbody className="divide-y divide-slate-100">
+                     {departmentDocs.map((doc, idx) => (
+                       <tr key={doc.id || idx} className="hover:bg-indigo-50/40 transition-colors">
+                         <td className="px-6 py-4">
+                           <div className="flex items-center gap-3">
+                             <div className="w-9 h-9 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-500 shrink-0">
+                               <span className="material-symbols-outlined text-base">
+                                 {(doc.filename || '').endsWith('.pdf') ? 'picture_as_pdf' :
+                                  (doc.filename || '').endsWith('.csv') ? 'table_chart' :
+                                  (doc.filename || '').endsWith('.docx') ? 'description' : 'insert_drive_file'}
+                               </span>
+                             </div>
+                             <span className="font-semibold text-sm text-slate-800 truncate max-w-[220px]">
+                               {doc.filename || 'Unnamed'}
+                             </span>
+                           </div>
+                         </td>
+                         <td className="px-6 py-4 text-sm text-slate-500">
+                           {(() => {
+                             if (!doc.uploaded_at) return 'N/A';
+                             const isStr = typeof doc.uploaded_at === 'string';
+                             const timestamp = (isStr && !doc.uploaded_at.endsWith('Z') && !doc.uploaded_at.includes('+')) 
+                               ? (doc.uploaded_at.includes('T') ? doc.uploaded_at + 'Z' : doc.uploaded_at.replace(' ', 'T') + 'Z')
+                               : doc.uploaded_at;
+                             const d = new Date(timestamp);
+                             return d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' }) + 
+                                    ' ' + d.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true });
+                           })()}
+                         </td>
+                         <td className="px-6 py-4">
+                           <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700">
+                             {doc.access_mode || doc.accessMode || 'All'}
+                           </span>
+                         </td>
+                         <td className="px-6 py-4">
+                           <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                             doc.status === 'indexed' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                           }`}>
+                             {doc.status || 'processed'}
+                           </span>
+                         </td>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
+               )}
              </div>
           </div>
         )}

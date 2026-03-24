@@ -12,6 +12,13 @@ const DashboardPage = () => {
   const [error, setError] = useState('')
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [toast, setToast] = useState(null)
+  const [now, setNow] = useState(Date.now())
+
+  // Tick every 30 seconds so relative timestamps auto-update
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(timer)
+  }, [])
 
   const showToast = (message, tone = 'success') => {
     setToast({ message, tone })
@@ -47,14 +54,54 @@ const DashboardPage = () => {
 
   const uploadedAgo = (iso) => {
     if (!iso) return 'Unknown time'
-    const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-    if (seconds < 60) return `${seconds}s ago`
-    const minutes = Math.floor(seconds / 60)
-    if (minutes < 60) return `${minutes}m ago`
-    const hours = Math.floor(minutes / 60)
-    if (hours < 24) return `${hours}h ago`
-    const days = Math.floor(hours / 24)
-    return `${days}d ago`
+
+    // Force UTC interpretation for database strings lacking 'Z'
+    let timestamp = iso;
+    if (typeof iso === 'string' && !iso.endsWith('Z') && !iso.includes('+') && !iso.includes('T')) {
+      // Handle "YYYY-MM-DD HH:MM:SS"
+      timestamp = iso.replace(' ', 'T') + 'Z';
+    } else if (typeof iso === 'string' && !iso.endsWith('Z') && !iso.includes('+')) {
+      // Handle "YYYY-MM-DDTHH:MM:SS"
+      timestamp = iso + 'Z';
+    }
+
+    const date = new Date(timestamp)
+    const diffMs = now - date.getTime()
+    const diffSec = Math.floor(diffMs / 1000)
+    const diffMin = Math.floor(diffSec / 60)
+
+    if (diffSec < 60) return 'just now'
+    if (diffMin < 60) return `${diffMin}m ago`
+
+    // Format the time in IST
+    const timeStr = date.toLocaleTimeString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    })
+
+    // Shift timestamps to IST (UTC+5:30) using fixed offset for reliable comparison
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
+    const nowIST  = new Date(now + IST_OFFSET_MS)
+    const dateIST = new Date(date.getTime() + IST_OFFSET_MS)
+
+    // Compare YYYY-MM-DD strings in IST to determine Today / Yesterday
+    const nowDay       = nowIST.toISOString().slice(0, 10)
+    const dateDay      = dateIST.toISOString().slice(0, 10)
+    const yesterdayDay = new Date(nowIST.getTime() - 86_400_000).toISOString().slice(0, 10)
+
+    if (dateDay === nowDay)       return `Today at ${timeStr}`
+    if (dateDay === yesterdayDay) return `Yesterday at ${timeStr}`
+
+    // Older → full IST date + time
+    const dateFormatted = date.toLocaleDateString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
+    return `${dateFormatted} at ${timeStr}`
   }
 
   return (
