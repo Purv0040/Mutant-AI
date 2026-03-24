@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { deleteDocument, getDocumentChunkCounts, getDocuments, uploadDocument } from '../api'
+import { useAuth } from '../context/AuthContext'
+import { createUploadRequest, deleteDocument, getDocumentChunkCounts, getDocuments, uploadDocument } from '../api'
 import UploadRequestModal from './UploadRequestModal'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -180,6 +181,7 @@ function PreviewModal({ file, onClose }) {
 
 // ── DocumentPanel ──────────────────────────────────────────────────────────────
 export default function DocumentPanel({ onUploaded }) {
+  const { isAdmin, user } = useAuth()
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -190,7 +192,6 @@ export default function DocumentPanel({ onUploaded }) {
   const [error, setError] = useState('')
   const [previewFile, setPreviewFile] = useState(null)
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
-  const fileInputRef = useRef(null)
 
   const loadDocuments = async () => {
     setLoading(true)
@@ -227,27 +228,11 @@ export default function DocumentPanel({ onUploaded }) {
     init()
   }, [])
 
-  const handleSelectFile = async (event) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-    setUploading(true)
-    setUploadProgress(0)
-    setError('')
-    try {
-      const result = await uploadDocument(file, {
-        onProgress: (percent) => setUploadProgress(percent),
-      })
-      await loadDocuments()
-      await loadChunkCounts()
-      if (onUploaded) onUploaded(result.filename)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setUploading(false)
-      setUploadProgress(0)
-      event.target.value = ''
-    }
-  }
+  useEffect(() => {
+    const openUploadModal = () => setUploadModalOpen(true)
+    window.addEventListener('mutant:open-upload-modal', openUploadModal)
+    return () => window.removeEventListener('mutant:open-upload-modal', openUploadModal)
+  }, [])
 
   const handleModalSubmit = async ({ file, accessMode }) => {
     if (!file) return
@@ -255,13 +240,22 @@ export default function DocumentPanel({ onUploaded }) {
     setUploadProgress(0)
     setError('')
     try {
-      const result = await uploadDocument(file, {
-        onProgress: (percent) => setUploadProgress(percent),
-        accessMode,
-      })
-      await loadDocuments()
-      await loadChunkCounts()
-      if (onUploaded) onUploaded(result.filename)
+      if (isAdmin) {
+        const result = await uploadDocument(file, {
+          onProgress: (percent) => setUploadProgress(percent),
+          accessMode,
+        })
+        await loadDocuments()
+        await loadChunkCounts()
+        if (onUploaded) onUploaded(result.filename)
+      } else {
+        const enforcedDepartment = user?.department || accessMode || 'All'
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('access_mode', enforcedDepartment)
+        formData.append('department', enforcedDepartment)
+        await createUploadRequest(formData)
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -294,6 +288,7 @@ export default function DocumentPanel({ onUploaded }) {
       <UploadRequestModal
         isOpen={uploadModalOpen}
         onClose={() => setUploadModalOpen(false)}
+        defaultAccessMode={!isAdmin ? (user?.department || 'All') : 'All'}
         onSubmit={handleModalSubmit}
       />
 
@@ -375,30 +370,6 @@ export default function DocumentPanel({ onUploaded }) {
           {error && <p className="text-[11px] text-red-600 px-2 py-2">{error}</p>}
         </div>
 
-        {/* Upload zone */}
-        <div className="p-3">
-          {uploading && (
-            <p className="text-[11px] text-blue-700 mb-2">Uploading document: {uploadProgress}%</p>
-          )}
-          <button
-            type="button"
-            onClick={() => setUploadModalOpen(true)}
-            disabled={uploading}
-            className="w-full border border-dashed border-outline-variant rounded-card p-4 text-center hover:border-accent hover:bg-accent/5 transition-all cursor-pointer disabled:opacity-60"
-          >
-            <div className="flex justify-center mb-2 text-on-surface-variant">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <polyline points="16 16 12 12 8 16" />
-                <line x1="12" y1="12" x2="12" y2="21" />
-                <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
-              </svg>
-            </div>
-            <p className="text-[11px] font-medium text-on-surface-variant">
-              {uploading ? 'Uploading...' : 'Upload file'}
-            </p>
-            <p className="text-[10px] text-outline mt-0.5">PDF, DOCX, CSV</p>
-          </button>
-        </div>
       </aside>
     </>
   )

@@ -275,6 +275,13 @@ export function deleteChatSession(sessionId) {
 
 /** User submits an upload request (saved to MongoDB) */
 export function createUploadRequest(formData) {
+  if (formData instanceof FormData) {
+    return request('/upload-requests', {
+      method: 'POST',
+      body: formData,
+    })
+  }
+
   return request('/upload-requests', {
     method: 'POST',
     body: formData,

@@ -54,8 +54,10 @@ export default function AskAI() {
   // ── UI state ──
   const [menuOpen, setMenuOpen]       = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false)
   const menuRef                       = useRef(null)
   const historyRef                    = useRef(null)
+  const attachMenuRef                 = useRef(null)
 
   // ── Auto-scroll ──
   useEffect(() => {
@@ -126,6 +128,12 @@ export default function AskAI() {
     if (historyOpen) document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [historyOpen])
+
+  useEffect(() => {
+    const h = (e) => { if (attachMenuRef.current && !attachMenuRef.current.contains(e.target)) setAttachMenuOpen(false) }
+    if (attachMenuOpen) document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [attachMenuOpen])
 
   // ── Send message ──
   const sendMessage = useCallback(async (question) => {
@@ -496,24 +504,65 @@ export default function AskAI() {
 
           {/* Input area */}
           <div className="px-8 py-6 border-t border-gray-100 bg-white">
-            <div className="flex items-center gap-4 bg-gray-50 rounded-2xl px-5 py-4 border border-gray-200 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-300 transition-all">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                placeholder="Message AI about your company archival data…"
-                className="flex-1 bg-transparent text-[14px] text-gray-800 placeholder-gray-400 outline-none font-medium"
-                id="chat-input"
-              />
-              <button
-                onClick={handleSend}
-                disabled={loading}
-                className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 transition-all hover:shadow-lg hover:shadow-blue-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                id="send-button"
-              >
-                <span className="material-symbols-outlined text-[20px]">send</span>
-              </button>
+            <div className="bg-gray-50 rounded-2xl border border-gray-200 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-300 transition-all">
+              <div className="relative flex items-end p-4 gap-2">
+                <div className="relative" ref={attachMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setAttachMenuOpen((prev) => !prev)}
+                    className="p-2 text-gray-400 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50"
+                    title="Attach file"
+                  >
+                    <span className="material-symbols-outlined">attach_file</span>
+                  </button>
+
+                  {attachMenuOpen && (
+                    <div
+                      className="absolute bottom-12 left-0 min-w-[220px] bg-white border border-gray-200 rounded-2xl shadow-2xl overflow-hidden z-50"
+                      style={{ animation: 'fadeSlideUp 0.15s ease-out' }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAttachMenuOpen(false)
+                          window.dispatchEvent(new CustomEvent('mutant:open-upload-modal'))
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[18px] text-gray-500">attach_file</span>
+                        <span className="text-[13px] font-semibold text-gray-700">Upload files</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      handleSend()
+                    }
+                  }}
+                  placeholder="Ask Aura anything about your documents..."
+                  rows={1}
+                  id="chat-input"
+                  className="flex-1 bg-transparent border-none focus:ring-0 text-gray-800 placeholder:text-gray-400 py-2 resize-none max-h-40 font-body text-sm leading-relaxed outline-none"
+                />
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleSend}
+                    disabled={loading}
+                    className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-200 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    id="send-button"
+                    title="Send"
+                  >
+                    <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>send</span>
+                  </button>
+                </div>
+              </div>
             </div>
             <div className="flex items-center justify-center gap-4 mt-3">
               <span className="text-[10px] text-gray-400 font-bold tracking-widest uppercase">Privacy Shield Active</span>
@@ -535,6 +584,10 @@ export default function AskAI() {
         @keyframes fadeSlideDown {
           from { transform: translateY(-8px); opacity: 0; }
           to   { transform: translateY(0);    opacity: 1; }
+        }
+        @keyframes fadeSlideUp {
+          from { transform: translateY(8px); opacity: 0; }
+          to   { transform: translateY(0);   opacity: 1; }
         }
       `}</style>
     </div>
